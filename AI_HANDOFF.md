@@ -19,9 +19,40 @@
   (`src/lib/env.ts`, `.env.example`); server secrets intentionally absent.
 - Dependency notes: `react-native-screens ~4.26.0`,
   `react-native-safe-area-context ~5.7.0`, `jest ~29.7.0`,
-  `@types/jest 29.5.14` per `expo install --fix` (SDK 57);
-  `overrides.react-dom = 19.2.0` to match scaffold-pinned react 19.2.3
-  (latest react-dom 19.3.0 requires react ^19.3.0).
+  `@types/jest 29.5.14` per `expo install --fix` (SDK 57).
+  (The `overrides.react-dom` pin from the original Phase 1 commit was
+  removed again in the Phase 1 follow-up below.)
+
+## Phase 1 follow-up checkpoint (review items, before Phase 2)
+- Docs commit: `a75352a docs: add reconcile source-of-truth documentation`
+  (PROJECT_SPEC, ARCHITECTURE, IMPLEMENTATION_PLAN, AGENTS,
+  RECONCILE_BLUEPRINT; README was already tracked).
+- Cleanup commit: `e449a67 chore: phase 1 cleanup — env scope, dependency
+  verification, minimal placeholders`.
+- Env cleanup: `.env.example` and `src/lib/env.ts` now expose only
+  `EXPO_PUBLIC_APP_ENV`. The future-phase `EXPO_PUBLIC_SUPABASE_URL` /
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY` declarations (and their test) were
+  removed. Secret grep over the repo (excluding node_modules/.git) matches
+  only the server-only key list documented in RECONCILE_BLUEPRINT.md —
+  no server secret is referenced in the mobile codebase.
+- react-dom override decision: REMOVED. Evidence: `npm view
+  react-dom@19.3.0 peerDependencies` → `{ react: '^19.3.0' }`, but a fresh
+  `npm install` with no lockfile and no override succeeds (1000 packages,
+  benign worklets warnings only); `npm install --package-lock-only`
+  without the override keeps a working lock; `npx expo install --check`
+  and `npx expo install --fix` both report "Dependencies are up to date".
+  The override was pinning a transitive optional peer, not masking a stale
+  lock or wrong dependency, so it was unnecessary.
+- Placeholders: `app/index.tsx`, `app/activity.tsx`, `app/budget.tsx`,
+  `app/insights.tsx` render plain-text labels only (unstyled `Link`s kept
+  so the Expo Router structure stays navigable). No styled cards/colors.
+- ErrorBoundary: used only in `app/_layout.tsx` at the root, wrapping the
+  Stack. No per-route usage.
+- Raw check outputs on the final tree:
+  - `npx tsc --noEmit` → exit 0, no output.
+  - `npx eslint .` → exit 0, no output.
+  - `npx jest` → `PASS tests/smoke.test.ts`, 3/3 tests passed
+    (theme tokens, default env, known/rejected env values).
 
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
