@@ -1,10 +1,12 @@
-// Client-safe environment handling pattern.
+// Client-safe environment handling pattern (Phase 1: app environment only).
 //
 // Only EXPO_PUBLIC_* keys are ever exposed to the mobile bundle (Expo injects
-// them into `process.env`). Server-only secrets (Supabase service-role key,
-// Mono keys, OpenAI key, RevenueCat webhook secret) must NEVER use the
-// EXPO_PUBLIC_ prefix and must never be read here. They arrive in later phases
-// as Supabase Edge Function secrets only.
+// them into `process.env`). Additional client-safe keys (Supabase URL/anon
+// key, RevenueCat keys) arrive with their respective later phases.
+// Server-only secrets (Supabase service-role key, Mono keys, OpenAI key,
+// RevenueCat webhook secret) must NEVER use the EXPO_PUBLIC_ prefix and must
+// never be read here. They arrive in later phases as Supabase Edge Function
+// secrets only.
 //
 // Reads via `globalThis` so this module stays dependency-free and safe to
 // import from tests, components and routes.
@@ -41,23 +43,11 @@ export function parseAppEnv(raw: string | undefined): AppEnvName {
 
 export interface PublicEnv {
   readonly appEnv: AppEnvName;
-  /** Optional until the Supabase Auth phase; must be https when set. */
-  readonly supabaseUrl: string | undefined;
-  /** Optional until the Supabase Auth phase (anon key only, never secrets). */
-  readonly supabaseAnonKey: string | undefined;
 }
 
 export function loadPublicEnv(source: RawEnv = readRawEnv()): PublicEnv {
-  const supabaseUrl = source["EXPO_PUBLIC_SUPABASE_URL"];
-  if (supabaseUrl !== undefined && !supabaseUrl.startsWith("https://")) {
-    throw new Error(
-      "Invalid EXPO_PUBLIC_SUPABASE_URL: expected an https:// URL.",
-    );
-  }
   return {
     appEnv: parseAppEnv(source["EXPO_PUBLIC_APP_ENV"]),
-    supabaseUrl,
-    supabaseAnonKey: source["EXPO_PUBLIC_SUPABASE_ANON_KEY"],
   };
 }
 

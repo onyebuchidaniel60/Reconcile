@@ -28,15 +28,4 @@ describe("Phase 1 smoke", () => {
     expect(parseAppEnv("production")).toBe("production");
     expect(() => parseAppEnv("prod")).toThrow();
   });
-
-  it("rejects non-https Supabase URLs", () => {
-    expect(() =>
-      loadPublicEnv({ EXPO_PUBLIC_SUPABASE_URL: "http://insecure.local" }),
-    ).toThrow();
-    expect(
-      loadPublicEnv({
-        EXPO_PUBLIC_SUPABASE_URL: "https://demo.supabase.co",
-      }).supabaseUrl,
-    ).toBe("https://demo.supabase.co");
-  });
 });
