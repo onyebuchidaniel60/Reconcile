@@ -82,6 +82,14 @@ create index transactions_user_occurred_idx
   on public.transactions (user_id, occurred_at desc);
 create index transactions_account_idx on public.transactions (bank_account_id);
 
+-- ------------------------------------------------------------ categories
+-- Created early: transaction_reviews references it.
+create table public.categories (
+  id text primary key,
+  label text not null,
+  created_at timestamptz not null default now()
+);
+
 -- -------------------------------------------------- transaction_reviews
 -- User-owned review/category state. Separate from immutable facts.
 create table public.transaction_reviews (
@@ -100,13 +108,7 @@ create table public.transaction_reviews (
 create index transaction_reviews_user_status_idx
   on public.transaction_reviews (user_id, status);
 
--- ------------------------------------------------------------ categories
-create table public.categories (
-  id text primary key,
-  label text not null,
-  created_at timestamptz not null default now()
-);
-
+-- ------------------------------------------------------- category seeds
 insert into public.categories (id, label) values
   ('food', 'Food'),
   ('transport', 'Transport'),

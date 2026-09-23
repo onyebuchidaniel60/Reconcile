@@ -42,12 +42,20 @@ export interface PublicEnv {
 }
 
 export function loadPublicEnv(source: RawEnv = readRawEnv()): PublicEnv {
-  const supabaseUrl = source["EXPO_PUBLIC_SUPABASE_URL"];
+  let supabaseUrl = source["EXPO_PUBLIC_SUPABASE_URL"];
   if (!supabaseUrl || !supabaseUrl.startsWith("https://")) {
     throw new Error(
       "Missing or invalid EXPO_PUBLIC_SUPABASE_URL: expected an https:// URL.",
     );
   }
+  // supabase-js appends service paths itself; a path suffix (e.g. /rest/v1)
+  // breaks every client call. Fail fast instead of misbehaving at runtime.
+  if (new URL(supabaseUrl).pathname !== "/") {
+    throw new Error(
+      "Invalid EXPO_PUBLIC_SUPABASE_URL: use the bare project URL with no path.",
+    );
+  }
+  supabaseUrl = supabaseUrl.replace(/\/+$/, "");
   const supabaseAnonKey = source["EXPO_PUBLIC_SUPABASE_ANON_KEY"];
   if (!supabaseAnonKey) {
     throw new Error("Missing EXPO_PUBLIC_SUPABASE_ANON_KEY.");

@@ -27,10 +27,12 @@ describe("deterministic categorization", () => {
       ["MTN airtime", "bills"],
       ["DSTV subscription", "entertainment"],
       ["Jumia order", "shopping"],
+      ["Jumia order refund", "shopping"],
+      ["DSTV duplicate charge reversal", "entertainment"],
       ["Medplus Pharmacy", "health"],
       ["Monthly salary payment", "income"],
-      ["Jumia order refund", "refund"],
       ["Transfer to GTBank", "external_transfer"],
+      ["Refund received", "other"],
     ];
     for (const [raw, category] of cases) {
       const normalized = normalizeMerchantName(raw);

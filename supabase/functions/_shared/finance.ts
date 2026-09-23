@@ -100,8 +100,6 @@ const SEED_RULES: SeedRule[] = [
   { match: "salary", category: "income" },
   { match: "freelance", category: "income" },
   { match: "interest", category: "income" },
-  { match: "refund", category: "refund" },
-  { match: "reversal", category: "refund" },
   { match: "bolt", category: "transport" },
   { match: "uber", category: "transport" },
   { match: "lagride", category: "transport" },
@@ -187,7 +185,15 @@ const TRANSFER_WINDOW_MS = 48 * 60 * 60 * 1000;
 export function findInternalTransferPairs(
   rows: TransferCandidate[],
 ): Array<[TransferCandidate, TransferCandidate]> {
-  const debits = rows
+  // Defense in depth: ignore malformed rows (e.g. undefined amounts from a
+  // bad mapping) rather than matching everything to everything.
+  const sane = rows.filter(
+    (r) =>
+      Number.isInteger(r.amountMinor) &&
+      r.amountMinor > 0 &&
+      Number.isFinite(r.occurredAtMs),
+  );
+  const debits = sane
     .filter((r) => r.direction === "debit" && r.semanticType !== "internal_transfer")
     .sort((a, b) => a.occurredAtMs - b.occurredAtMs);
   const credits = rows

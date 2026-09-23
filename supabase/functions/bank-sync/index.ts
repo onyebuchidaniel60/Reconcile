@@ -114,7 +114,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   });
 
   let added = 0;
-  const addedIds: string[] = [];
   if (fresh.length > 0) {
     const rows = fresh.map((t) => ({
       user_id: userId,
@@ -142,23 +141,66 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return await fail("SYNC_INSERT_FAILED", "We could not save the new transactions.");
     }
     added = inserted?.length ?? 0;
-    for (const row of inserted ?? []) addedIds.push(row.id);
   }
 
-  // Review state for newly added transactions.
-  if (addedIds.length > 0) {
+  // Ledger snapshot for transfer detection and review backfill.
+  const { data: ledger } = await client
+    .from("transactions")
+    .select(
+      "id,bank_account_id,direction,amount_minor,occurred_at,semantic_type,normalized_merchant,narration",
+    )
+    .eq("user_id", userId);
+
+  // High-confidence internal-transfer detection first, so pair members land
+  // reconciled instead of needs_review.
+  const ledgerCandidates: TransferCandidate[] = (ledger ?? []).map((r) => ({
+    id: r.id,
+    bankAccountId: r.bank_account_id,
+    direction: r.direction,
+    amountMinor: r.amount_minor,
+    occurredAtMs: Date.parse(r.occurred_at),
+    semanticType: r.semantic_type,
+  }));
+  const pairs = findInternalTransferPairs(ledgerCandidates);
+  for (const [a, b] of pairs) {
+    const { error: pairError } = await client
+      .from("transactions")
+      .update({ semantic_type: "internal_transfer", budget_eligible: false })
+      .in("id", [a.id, b.id]);
+    if (pairError) {
+      return await fail("SYNC_TRANSFER_FAILED", "We could not flag internal transfers.");
+    }
+    const { error: pairReviewError } = await client.from("transaction_reviews").upsert(
+      [a.id, b.id].map((id) => ({
+        transaction_id: id,
+        user_id: userId,
+        status: "reconciled",
+        category_id: "internal_transfer",
+        source: "system:internal_transfer",
+        confirmed_at: new Date().toISOString(),
+      })),
+      { onConflict: "transaction_id", ignoreDuplicates: true },
+    );
+    if (pairReviewError) {
+      return await fail("SYNC_TRANSFER_FAILED", "We could not flag internal transfers.");
+    }
+  }
+
+  // Review state for every transaction still missing one. Self-healing:
+  // covers fresh inserts and any earlier partial failure.
+  const { data: reviewed } = await client
+    .from("transaction_reviews")
+    .select("transaction_id")
+    .eq("user_id", userId);
+  const reviewedIds = new Set((reviewed ?? []).map((r) => r.transaction_id));
+  const missing = (ledger ?? []).filter((t) => !reviewedIds.has(t.id));
+  if (missing.length > 0) {
     const { data: rules } = await client
       .from("merchant_rules")
       .select("merchant_key,category_id")
       .eq("user_id", userId);
     const ruleMap = new Map((rules ?? []).map((r) => [r.merchant_key, r.category_id]));
-
-    const { data: addedTxns } = await client
-      .from("transactions")
-      .select("id,merchant_name,normalized_merchant,narration")
-      .in("id", addedIds);
-
-    const reviews = (addedTxns ?? []).map((t) => {
+    const reviews = missing.map((t) => {
       const suggestion = categorize({
         merchantKey: t.normalized_merchant ?? "",
         normalizedMerchant: t.normalized_merchant ?? "",
@@ -173,44 +215,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
         source: `suggestion:${suggestion.source}`,
       };
     });
-    if (reviews.length > 0) {
-      await client.from("transaction_reviews").upsert(reviews, {
-        onConflict: "transaction_id",
-        ignoreDuplicates: true,
-      });
+    const { error: reviewError } = await client.from("transaction_reviews").upsert(reviews, {
+      onConflict: "transaction_id",
+      ignoreDuplicates: true,
+    });
+    if (reviewError) {
+      return await fail("SYNC_REVIEWS_FAILED", "We could not create the review queue.");
     }
-  }
-
-  // High-confidence internal-transfer detection across the user's ledger.
-  const { data: ledger } = await client
-    .from("transactions")
-    .select("id,bank_account_id,direction,amount_minor,occurred_at,semantic_type")
-    .eq("user_id", userId);
-  const ledgerCandidates: TransferCandidate[] = (ledger ?? []).map((r) => ({
-    id: r.id,
-    bankAccountId: r.bank_account_id,
-    direction: r.direction,
-    amountMinor: r.amountMinor,
-    occurredAtMs: Date.parse(r.occurred_at),
-    semanticType: r.semantic_type,
-  }));
-  const pairs = findInternalTransferPairs(ledgerCandidates);
-  for (const [a, b] of pairs) {
-    await client
-      .from("transactions")
-      .update({ semantic_type: "internal_transfer", budget_eligible: false })
-      .in("id", [a.id, b.id]);
-    await client.from("transaction_reviews").upsert(
-      [a.id, b.id].map((id) => ({
-        transaction_id: id,
-        user_id: userId,
-        status: "reconciled",
-        category_id: "internal_transfer",
-        source: "system:internal_transfer",
-        confirmed_at: new Date().toISOString(),
-      })),
-      { onConflict: "transaction_id", ignoreDuplicates: true },
-    );
   }
 
   if (run) {

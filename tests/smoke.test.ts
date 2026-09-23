@@ -48,5 +48,11 @@ describe("Phase 1 smoke", () => {
     expect(() =>
       loadPublicEnv({ ...VALID_SOURCE, EXPO_PUBLIC_SUPABASE_ANON_KEY: undefined }),
     ).toThrow();
+    expect(() =>
+      loadPublicEnv({
+        ...VALID_SOURCE,
+        EXPO_PUBLIC_SUPABASE_URL: "https://demo.supabase.co/rest/v1",
+      }),
+    ).toThrow();
   });
 });

@@ -50,13 +50,29 @@ describe("internal transfer matching (high-confidence only)", () => {
     ).toHaveLength(0);
   });
 
-  it("matches each transaction at most once", () => {
-    const pairs = findInternalTransferPairs([
+  it("matches each transaction at most once", () => {    const pairs = findInternalTransferPairs([
       cand({ id: "d1", bankAccountId: "uba", direction: "debit" }),
       cand({ id: "c1", bankAccountId: "gtb", direction: "credit" }),
       cand({ id: "c2", bankAccountId: "gtb", direction: "credit" }),
     ]);
     expect(pairs).toHaveLength(1);
+  });
+
+  it("ignores malformed rows instead of matching everything", () => {
+    const broken = {
+      id: "x",
+      bankAccountId: "other",
+      direction: "credit",
+      occurredAtMs: T0,
+      semanticType: "expense",
+    };
+    expect(
+      findInternalTransferPairs([
+        cand({ id: "d1", bankAccountId: "uba", direction: "debit" }),
+        { ...broken, amountMinor: undefined } as unknown as TransferCandidate,
+        { ...broken, id: "y", amountMinor: Number.NaN } as unknown as TransferCandidate,
+      ]),
+    ).toHaveLength(0);
   });
 });
 

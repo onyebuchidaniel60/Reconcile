@@ -78,6 +78,12 @@ function friendly(error: unknown, fallback: string): string {
   return fallback;
 }
 
+async function currentUserId(): Promise<string> {
+  const { data, error } = await getSupabase().auth.getUser();
+  if (error || !data.user) throw new Error("Please sign in and try again.");
+  return data.user.id;
+}
+
 export async function getActiveConnection(): Promise<BankConnection | null> {
   const { data, error } = await getSupabase()
     .from("bank_connections")
@@ -250,9 +256,11 @@ export async function createBudget(
   caps: BudgetCap[],
 ): Promise<void> {
   const supabase = getSupabase();
+  const userId = await currentUserId();
   const { data, error } = await supabase
     .from("budgets")
     .insert({
+      user_id: userId,
       period_type: "monthly",
       period_start: periodStart,
       period_end: periodEnd,
