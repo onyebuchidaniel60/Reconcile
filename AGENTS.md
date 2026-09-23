@@ -37,9 +37,11 @@ Before changing code, read:
 23. Make small meaningful commits.
 24. Update `AI_HANDOFF.md` at every checkpoint.
 25. Stop after the assigned phase.
+26. Follow SKILL_LEAN_DELIVERY.md for delivery sequencing, deployment, and agent-as-user verification.
 
 ## UI rules
 Follow the provided black/white/yellow visual direction, rounded cards, large numeric hierarchy, floating pill navigation, outline icons and purposeful animation. Do not replace it with generic SaaS styling.
+Follow design.md, frontend-implementation-plan.md, and SKILL_FRONTEND_DESIGN.md for all full frontend implementation. The demo uses their spirit only.
 
 ## Financial rules
 - amounts use integer minor units + currency;
