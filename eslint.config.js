@@ -5,6 +5,8 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   ...expoConfig,
   {
-    ignores: ["dist/*", ".expo/*"],
+    // Deno Edge Functions use jsr:/Deno imports the Expo web config
+    // cannot resolve; they are covered by tsc (pure modules) and jest.
+    ignores: ["dist/*", ".expo/*", "supabase/functions/**"],
   },
 ]);

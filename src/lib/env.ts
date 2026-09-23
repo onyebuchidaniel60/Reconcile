@@ -1,15 +1,9 @@
-// Client-safe environment handling pattern (Phase 1: app environment only).
-//
-// Only EXPO_PUBLIC_* keys are ever exposed to the mobile bundle (Expo injects
-// them into `process.env`). Additional client-safe keys (Supabase URL/anon
-// key, RevenueCat keys) arrive with their respective later phases.
-// Server-only secrets (Supabase service-role key, Mono keys, OpenAI key,
-// RevenueCat webhook secret) must NEVER use the EXPO_PUBLIC_ prefix and must
-// never be read here. They arrive in later phases as Supabase Edge Function
-// secrets only.
-//
-// Reads via `globalThis` so this module stays dependency-free and safe to
-// import from tests, components and routes.
+// Client-safe environment handling.
+// Only EXPO_PUBLIC_* keys are ever exposed to the bundle (Expo injects them
+// into `process.env`). Server-only secrets must NEVER use the EXPO_PUBLIC_
+// prefix and are never read here.
+// Reads via `globalThis` so this module stays dependency-free. Access is lazy
+// (`getEnv`) so misconfiguration renders a setup message instead of crashing.
 
 export type AppEnvName = "development" | "staging" | "production";
 
@@ -19,7 +13,7 @@ const APP_ENV_VALUES: readonly AppEnvName[] = [
   "production",
 ];
 
-type RawEnv = Record<string, string | undefined>;
+export type RawEnv = Record<string, string | undefined>;
 
 function readRawEnv(): RawEnv {
   const holder = globalThis as {
@@ -43,13 +37,53 @@ export function parseAppEnv(raw: string | undefined): AppEnvName {
 
 export interface PublicEnv {
   readonly appEnv: AppEnvName;
+  readonly supabaseUrl: string;
+  readonly supabaseAnonKey: string;
 }
 
 export function loadPublicEnv(source: RawEnv = readRawEnv()): PublicEnv {
+  const supabaseUrl = source["EXPO_PUBLIC_SUPABASE_URL"];
+  if (!supabaseUrl || !supabaseUrl.startsWith("https://")) {
+    throw new Error(
+      "Missing or invalid EXPO_PUBLIC_SUPABASE_URL: expected an https:// URL.",
+    );
+  }
+  const supabaseAnonKey = source["EXPO_PUBLIC_SUPABASE_ANON_KEY"];
+  if (!supabaseAnonKey) {
+    throw new Error("Missing EXPO_PUBLIC_SUPABASE_ANON_KEY.");
+  }
   return {
     appEnv: parseAppEnv(source["EXPO_PUBLIC_APP_ENV"]),
+    supabaseUrl,
+    supabaseAnonKey,
   };
 }
 
-/** Validated, client-safe environment snapshot for the running app. */
-export const env: PublicEnv = loadPublicEnv();
+let cached: PublicEnv | null = null;
+let failed = false;
+
+export function getEnv(): PublicEnv {
+  if (!cached && !failed) {
+    try {
+      cached = loadPublicEnv();
+    } catch {
+      failed = true;
+    }
+  }
+  if (!cached) {
+    throw new Error(
+      "App is not configured: set EXPO_PUBLIC_SUPABASE_URL and " +
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY.",
+    );
+  }
+  return cached;
+}
+
+export function isConfigured(): boolean {
+  try {
+    getEnv();
+    return true;
+  } catch {
+    return false;
+  }
+}
