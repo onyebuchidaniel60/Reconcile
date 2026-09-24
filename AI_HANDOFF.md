@@ -196,3 +196,41 @@ After Phase 1:
 - update this handoff;
 - commit;
 - STOP.
+
+## Phase 3 checkpoint (design tokens)
+- Commit: `3120a3c feat: add design token system (Phase 3)`, plus
+  `ba9f748 fix: enable clean URLs for static web routes`,
+  `1d4507b fix: normalize to-one review embeds and ask basis line`,
+  `5b4c517 docs: refresh browser screenshots from verified regression pass`.
+- Tokens: `src/theme/` now holds `colors.ts` (exact design.md §3 palette +
+  `categoryTints`), `type.ts`, `spacing.ts`, `radius.ts`, `motion.ts`
+  (`durations`, `easings`, `resolveDurations`, `useMotion`), `index.ts`.
+  The old `tokens.ts` was deleted; its three importers were repointed.
+- Title approach: paired titles ship as a `titleLight` (300) + `titleHeavy`
+  (700) pair sharing size/line-height, never a single-weight `title`.
+- Font decision: Inter installed via `@expo-google-fonts/inter` (+ `expo-font`,
+  `expo-splash-screen`) and loaded for all six weights in `app/_layout.tsx`
+  before first render, with system-font fallthrough on failure. No fallback
+  was needed. Demo screens render in Inter now; no screen was restyled.
+- Token-check: `npm run check:tokens` reports 0 violations (validated with a
+  planted violation first). Nothing to fix; Phase 4 begins enforcement. The
+  demo screens are plain, so violations cluster nowhere.
+- Browser tools (Part A): self-provisioned Playwright 1.63.0 + headless
+  Chromium (no MCP/browser-use tool exists in this environment). Smoke passed:
+  landing screenshots at 375×812 and 1280×800, "Enter Demo Mode" located by
+  text and clicked through a real signup→sync→Home loop, console readable
+  (empty), network observable, page text readable. Screenshots in
+  `docs/browser-tools/landing-*.png`, `demo-entered.png`.
+- Regression (second pass clean): fresh user → sign in → demo sync (55 txns)
+  → confirm → Insights renders with real numbers → Ask answers
+  "How much did I spend on food?" grounded. Console empty, no 4xx. Found and
+  fixed: (1) deep links 404 on Vercel (`cleanUrls: true` added); (2) PostgREST
+  to-one embeds arrive as objects, zeroing budget caps/insight changes/detail
+  review state (normalized with `asEmbedArray`); (3) doubled "based on:" prefix
+  in Ask answers.
+- No screen was restyled; no component built; `supabase/` untouched except
+  nothing (no migration needed); SKILL_FRONTEND_DESIGN.md remains unwritten
+  (earned at Phase 10).
+- Deploy: production `https://reconcile-h36wgzx1z-uhhh2.vercel.app` (alias
+  `reconcile-two-tau.vercel.app`), HTTP 200, bundle contains the project URL,
+  secrets scans zero.
