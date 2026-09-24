@@ -33,7 +33,16 @@ export interface NormalizedTransaction {
   budgetEligible: boolean;
 }
 
+// PostgREST returns to-one embeds (e.g. a unique transaction_reviews row)
+// as a single object, not an array. Normalize at the data boundary so
+// consumers always see arrays.
+export function asEmbedArray<T>(value: T | T[] | null | undefined): T[] {
+  if (value === null || value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
 // ------------------------------------------------------------------ money
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   NGN: "₦",
   USD: "$",

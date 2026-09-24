@@ -76,7 +76,7 @@ export default function AskScreen() {
             ) : (
               <View>
                 <Text>{item.text}</Text>
-                {item.basis ? <Text>based on: {item.basis}</Text> : null}
+                {item.basis ? <Text>{item.basis}</Text> : null}
               </View>
             )
           }

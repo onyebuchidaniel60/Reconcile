@@ -3,6 +3,7 @@
 // no function URLs outside this module.
 import { getSupabase } from "./supabase";
 import {
+  asEmbedArray,
   countMatchingConfirmations,
   shouldCreateRule,
 } from "../../supabase/functions/_shared/finance";
@@ -195,7 +196,14 @@ export async function getTransactions(limit = 200): Promise<Transaction[]> {
     .order("occurred_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(friendly(error, "Could not load transactions."));
-  return (data ?? []) as unknown as Transaction[];
+  return ((data ?? []) as unknown as RawTransactionRow[]).map((row) => ({
+    ...row,
+    transaction_reviews: asEmbedArray(row.transaction_reviews),
+  }));
+}
+
+interface RawTransactionRow extends Omit<Transaction, "transaction_reviews"> {
+  transaction_reviews: TxnReview | TxnReview[] | null;
 }
 
 export async function getTransaction(
@@ -210,7 +218,11 @@ export async function getTransaction(
     .maybeSingle();
   if (error) throw new Error(friendly(error, "Could not load transaction."));
   if (!data) throw new Error("Transaction not found.");
-  const row = data as unknown as Transaction;
+  const raw = data as unknown as RawTransactionRow;
+  const row: Transaction = {
+    ...raw,
+    transaction_reviews: asEmbedArray(raw.transaction_reviews),
+  };
   return { txn: row, review: row.transaction_reviews[0] ?? null };
 }
 

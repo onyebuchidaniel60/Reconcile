@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  asEmbedArray,
   categorySpend,
   forecastSpend,
   periodSpend,
@@ -67,6 +68,14 @@ describe("budget math", () => {
     expect(remainingBudget(200000, 250000)).toBe(-50000);
   });
 
+  it("normalizes to-one embeds to arrays", () => {
+    // PostgREST returns a unique embedded row as an object, not an array.
+    expect(asEmbedArray(null)).toEqual([]);
+    expect(asEmbedArray(undefined)).toEqual([]);
+    expect(asEmbedArray([{ a: 1 }])).toEqual([{ a: 1 }]);
+    expect(asEmbedArray({ a: 1 })).toEqual([{ a: 1 }]);
+  });
+
   it("forecasts only with sufficient elapsed data", () => {
     // 10% elapsed → insufficient.
     expect(
@@ -80,8 +89,7 @@ describe("budget math", () => {
     expect(forecastSpend(10000, START, END, END + 1)).toBeNull();
   });
 
-  it("tracks category spend with refunds", () => {
-    const rows = [
+  it("tracks category spend with refunds", () => {    const rows = [
       row({ amountMinor: 100000, categoryId: "food" }),
       row({ amountMinor: 20000, categoryId: "food", semanticType: "refund" }),
       row({ amountMinor: 50000, categoryId: "transport" }),
