@@ -124,6 +124,26 @@
 - Status: core demo loop deployed and verified as far as automation allows;
   NOT verified by agent-as-user (no browser tools).
 
+## Demo phase closed (2026-09-24, operator-verified)
+- Working deployed URL: `https://reconcile-two-tau.vercel.app`.
+- The operator verified the full loop in a browser: Enter Demo Mode works,
+  sync → review → confirm → budget updates, Insights renders, Ask Reconcile
+  answers grounded questions, no console errors.
+- Two bugs found during browser verification and fixed: (1) incomplete CORS
+  preflight on Edge Functions blocked every browser function call;
+  (2) missing babel-preset-expo plus whole-object `process.env` reads left
+  `EXPO_PUBLIC_*` values out of web bundles. Both are recorded with root
+  causes in the SKILL_LEAN_DELIVERY.md §8 evolution log.
+- This demo is now the frozen foundation for the full build (tag `demo-v1`).
+  Extend it; do not restart from scratch.
+- Deliberately NOT included: design system, charts, motion, haptics, pill
+  navigation, Mono integration, OpenAI/LLM, RevenueCat/paywall, webhooks,
+  CSV import, recurring detection, account deletion, and an interactive
+  agent-as-user pass by the agent (no browser tools; HTTP/bundle/live-E2E
+  verification instead).
+- SKILL_FRONTEND_DESIGN.md is intentionally unwritten. It will be earned
+  from the full frontend phase, per frontend-implementation-plan.md §16.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 

@@ -244,7 +244,39 @@ Rules superseded:
 
 ### Log
 
-(empty — first entry added after the first Stage 2 review)
+### 2026-09-24 — Reconcile — core demo (Stage 2 review)
+
+Worked:
+- Smallest real end-to-end loop first (auth → demo → sync → review → budget → insights → ask), deployed from the first slice.
+- Provider interface with a deterministic demo provider behind it: zero external credentials, real pipeline, synthetic data labeled everywhere.
+- Deterministic-first (no LLM): every number unit-testable, every answer reproducible.
+- RLS-first schema plus live integration tests: caught four real bugs (bad suggestion category, snake_case misread, missing user_id default, silent review-batch failure).
+- Pure shared modules imported by Deno functions, Metro, and jest: one source of truth, no logic duplication.
+- Committed `.env.production` (public values only) after Vercel env injection failed: deterministic builds.
+- No force-push through operator divergence: merge commit, conflicts resolved explicitly.
+
+Didn't work:
+- Assuming server-side green means browser green: incomplete CORS preflight killed every browser Edge Function call while all tests passed.
+- Assuming env-file presence means values in bundle: missing babel-preset-expo plus whole-object `process.env` reads left the web bundle with empty env.
+- jest-expo replaces global fetch with broken stubs: supabase-js needed an explicit node:http fetch shim in live tests.
+- A `/rest/v1/`-suffixed project URL in local config broke all client calls: added a fail-fast URL guard.
+- Vercel enables SSO Deployment Protection by default: first deployment served a login wall.
+
+Agent-as-user pass caught (that tests did not):
+- The CORS preflight bug and the babel-preset-expo/env-inlining bug, both caught by the operator in a browser, not by any test. The agent had no browser tools, so only the operator's pass could see them.
+- Bug class tests cannot catch: browser-runtime behaviors (CORS preflight negotiation, bundler transform output) that execute outside every unit/integration harness. A green suite plus a built bundle is not proof the app works in a browser; only a browser pass, or bundle-content assertions (env grep, route render), close that gap.
+
+Rule changes proposed:
+- Every Edge Function must ship with a CORS helper that is exercised by an OPTIONS preflight test before deployment.
+- Every client-facing EXPO_PUBLIC_* variable must be verified inside the exported web bundle before any deployment is called done.
+- Check Deployment Protection state on the first deploy of every new Vercel project.
+
+Rules validated:
+- Ship the smallest real slice, then iterate; deploy every slice; no mock data in UI paths; no secrets in the client bundle (grep gate held, zero matches every time); never claim a check passed without running it; stop-and-report at failed gates instead of pushing through.
+- Stage 0 docs before code: the slices never had to renegotiate scope.
+
+Rules superseded:
+- None.
 
 ## 9. Adopting this skill in a new project
 
