@@ -54,6 +54,39 @@
   - `npx jest` → `PASS tests/smoke.test.ts`, 3/3 tests passed
     (theme tokens, default env, known/rejected env values).
 
+## Slice 1 deployment checkpoint (Vercel, demo loop live)
+- Merge commit: `ccd6247 fix: inline EXPO_PUBLIC_* env vars via babel-preset-expo
+  and member reads` (merged origin/main operator commits; kept working
+  vercel.json with schema/build/output/framework/install fields).
+- Deploy: Vercel project `reconcile`, production
+  `https://reconcile-hlc8b8400-uhhh2.vercel.app`
+  (alias `https://reconcile-two-tau.vercel.app`), readyState READY.
+- Root causes for env values missing from the first bundle: (1) the repo had
+  no `babel.config.js` and no `babel-preset-expo` dependency, so Expo's
+  inline-env-vars babel plugin never ran; (2) `src/lib/env.ts` read
+  `process.env` as a whole object via `globalThis`, but the plugin only
+  inlines direct `process.env.EXPO_PUBLIC_*` member expressions. Fixed with
+  the preset dep, an explicit babel config, and member-access reads.
+- Verification: `curl -sIL` → HTTP 200 with Expo root div; deployed JS bundle
+  contains exactly one match equal to the Supabase project URL (not a
+  wildcard); secret scans (access token, service role) return zero matches
+  in `dist/` and in `app/`+`src/`.
+- Live backend proven earlier: migrations applied, 3 Edge Functions deployed,
+  live jest E2E green (sync idempotency, RLS isolation, review confirm,
+  internal-transfer exclusion, budget math).
+- Deployment Protection: SSO wall found ON by default and disabled via the
+  project API (`ssoProtection: null`, auditable, no dashboard use); verified
+  still OFF after redeploy, URL publicly reachable.
+- Status: Slice 1 deployed and verified by HTTP/bundle checks, NOT verified
+  by agent-as-user (no browser tools).
+- Manual verification checklist for the operator: sign up → Demo Mode →
+  sync (55 synthetic txns) → review queue → change/confirm a category →
+  Home and Budget update → sync again (added 0) → ₦50,000 internal-transfer
+  pair excluded from spend → activity filters → budget setup with caps →
+  disconnect → sign out → sign back in (state persists) → second user sees
+  none of the first user's rows; check 375px and 1280px layouts and a clean
+  console/network tab on each screen.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
