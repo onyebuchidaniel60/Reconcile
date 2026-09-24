@@ -4,6 +4,7 @@ import { AccessibilityInfo, Platform } from "react-native";
 
 export const durations = {
   press: 120,
+  pop: 180,
   ui: 200,
   chart: 240,
   panel: 280,
@@ -11,6 +12,7 @@ export const durations = {
 
 export type Durations = {
   press: number;
+  pop: number;
   ui: number;
   chart: number;
   panel: number;
@@ -24,7 +26,7 @@ export const easings = {
 /** Pure reduction logic: reduced motion zeroes every duration. Unit-tested. */
 export function resolveDurations(reduceMotion: boolean): Durations {
   if (reduceMotion) {
-    return { press: 0, ui: 0, chart: 0, panel: 0 };
+    return { press: 0, pop: 0, ui: 0, chart: 0, panel: 0 };
   }
   return { ...durations };
 }
@@ -40,8 +42,13 @@ function readInitialReduceMotion(): boolean {
   return false;
 }
 
+/** Testing seam (also used by the dev gallery toggle): force a value. */
+export interface MotionOptions {
+  forceReduceMotion?: boolean;
+}
+
 /** Durations honoring the OS reduced-motion setting. */
-export function useMotion(): Durations {
+export function useMotion(options?: MotionOptions): Durations {
   const [reduceMotion, setReduceMotion] = useState(readInitialReduceMotion);
   useEffect(() => {
     let mounted = true;
@@ -75,5 +82,8 @@ export function useMotion(): Durations {
       mounted = false;
     };
   }, []);
-  return useMemo(() => resolveDurations(reduceMotion), [reduceMotion]);
+  return useMemo(
+    () => resolveDurations(options?.forceReduceMotion ?? reduceMotion),
+    [options?.forceReduceMotion, reduceMotion],
+  );
 }

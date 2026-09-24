@@ -101,18 +101,18 @@ describe("design tokens (design.md §3–§5, §9)", () => {
   });
 
   it("exports the spacing and radius scales", () => {
-    expect(spacing).toEqual({ xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 });
+    expect(spacing).toEqual({ xxs: 6, xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 });
     expect(radius).toEqual({ chip: 12, compact: 20, card: 28, pill: 999 });
   });
 
   it("exports motion durations and easings", () => {
-    expect(durations).toEqual({ press: 120, ui: 200, chart: 240, panel: 280 });
+    expect(durations).toEqual({ press: 120, pop: 180, ui: 200, chart: 240, panel: 280 });
     expect(easings.easeOutStrong).toBe("cubic-bezier(0.23, 1, 0.32, 1)");
     expect(easings.easeInOut).toBe("cubic-bezier(0.77, 0, 0.175, 1)");
   });
 
   it("zeroes durations under reduced motion", () => {
-    expect(resolveDurations(true)).toEqual({ press: 0, ui: 0, chart: 0, panel: 0 });
+    expect(resolveDurations(true)).toEqual({ press: 0, pop: 0, ui: 0, chart: 0, panel: 0 });
     expect(resolveDurations(false)).toEqual({ ...durations });
   });
 });

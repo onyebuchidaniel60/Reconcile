@@ -1,17 +1,9 @@
-import { Pressable, type StyleProp, type ViewStyle } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { type StyleProp, type ViewStyle } from "react-native";
+import { usePressScale } from "../lib/motion/usePressScale";
 import { colors } from "../theme/colors";
-import { useMotion } from "../theme/motion";
 import { radius } from "../theme/radius";
 import { spacing } from "../theme/spacing";
-import { confirm } from "../lib/haptics";
 import { Text } from "./Text";
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export type ButtonVariant = "primary" | "secondary" | "ghost";
 
@@ -28,8 +20,9 @@ interface ButtonProps {
 
 /**
  * Button per design.md §7: 56px primary/secondary, 48px ghost, pill radius.
- * Pressed state scales to 0.97 over the press duration with a light haptic;
- * disabled renders at 40% opacity with no press animation.
+ * Press physics come from `usePressScale` (scale 0.97 + light haptic);
+ * disabled renders at 40% opacity with no press animation. This file makes
+ * no Reanimated or haptics calls of its own.
  */
 export function Button({
   title,
@@ -41,27 +34,12 @@ export function Button({
   testID,
   style,
 }: ButtonProps) {
-  const scale = useSharedValue(1);
-  const motion = useMotion();
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = (): void => {
-    if (disabled) return;
-    // Reanimated shared values are mutated by design; the immutability
-    // rule cannot model them.
-    // eslint-disable-next-line react-hooks/immutability
-    scale.value = withTiming(0.97, { duration: motion.press });
-    void confirm();
-  };
-
-  const handlePressOut = (): void => {
-    if (disabled) return;
-    // eslint-disable-next-line react-hooks/immutability
-    scale.value = withTiming(1, { duration: motion.press });
-  };
+  const {
+    Pressable: ScalePressable,
+    animatedStyle,
+    onPressIn,
+    onPressOut,
+  } = usePressScale(disabled);
 
   const height = variant === "ghost" ? 48 : 56;
   const backgroundColor =
@@ -73,13 +51,13 @@ export function Button({
   const borderWidth = variant === "secondary" ? 1 : 0;
 
   return (
-    <AnimatedPressable
+    <ScalePressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityState={{ disabled }}
       onPress={disabled ? undefined : onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
       disabled={disabled}
       testID={testID}
       style={[
@@ -103,6 +81,6 @@ export function Button({
         {title}
       </Text>
       {trailingIcon}
-    </AnimatedPressable>
+    </ScalePressable>
   );
 }

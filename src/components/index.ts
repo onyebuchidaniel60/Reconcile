@@ -1,11 +1,22 @@
 // Wave 1–3 primitives (Phase 4). Screens compose these; nothing else.
+export { BarChart, validateBarFills, type BarDatum, type BarFill } from "./BarChart";
 export { Button, type ButtonVariant } from "./Button";
 export { Card, type CardVariant } from "./Card";
+export { CategoryCircle } from "./CategoryCircle";
+export { ChartAxis, type AxisTick } from "./ChartAxis";
+export { ChartLegend, type LegendEntry } from "./ChartLegend";
+export { ChartTextEquivalent } from "./ChartTextEquivalent";
 export { Chip } from "./Chip";
 export { Divider } from "./Divider";
+export { Donut, describeDonutArc } from "./Donut";
+export { HatchPattern, toPatternId } from "./HatchPattern";
 export { IconButton } from "./IconButton";
 export { Input } from "./Input";
+export { LineChart, type LinePoint } from "./LineChart";
 export { PairedTitle } from "./PairedTitle";
+export { PillBadge, type PillBadgeVariant } from "./PillBadge";
+export { ProgressBar, type ProgressBarVariant } from "./ProgressBar";
 export { SectionHeader } from "./SectionHeader";
 export { Skeleton } from "./Skeleton";
+export { Starburst, type StarburstSize, type StarburstVariant } from "./Starburst";
 export { Text, type TextRole } from "./Text";
