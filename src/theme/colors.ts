@@ -14,6 +14,10 @@ export const colors = {
   lavender: "#A49BFF",
   // Emphasis (starburst badges and over-budget indicators only, never text)
   alertRed: "#EF3D28",
+  // Derived surfaces for pressables (design.md §7 icon buttons, §4 chips)
+  iconButton: "#E8E8E3",
+  inkOverlay10: "rgba(10, 10, 10, 0.1)",
+  paperOverlay12: "rgba(246, 246, 241, 0.12)",
 } as const;
 
 export type ColorName = keyof typeof colors;

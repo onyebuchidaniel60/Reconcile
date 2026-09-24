@@ -56,11 +56,21 @@ export function useMotion(): Durations {
         query.removeEventListener("change", listener);
       };
     }
-    AccessibilityInfo.isReduceMotionEnabled()
-      .then((value) => {
-        if (mounted) setReduceMotion(value);
-      })
-      .catch(() => {});
+    try {
+      const pending = AccessibilityInfo.isReduceMotionEnabled() as unknown;
+      if (
+        pending &&
+        typeof (pending as PromiseLike<boolean>).then === "function"
+      ) {
+        (pending as Promise<boolean>)
+          .then((value) => {
+            if (mounted) setReduceMotion(value);
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // Reduced-motion API unavailable; assume off.
+    }
     return () => {
       mounted = false;
     };

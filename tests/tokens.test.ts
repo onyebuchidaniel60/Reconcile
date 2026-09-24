@@ -29,6 +29,9 @@ describe("design tokens (design.md §3–§5, §9)", () => {
       coral: "#FFB0A8",
       lavender: "#A49BFF",
       alertRed: "#EF3D28",
+      iconButton: "#E8E8E3",
+      inkOverlay10: "rgba(10, 10, 10, 0.1)",
+      paperOverlay12: "rgba(246, 246, 241, 0.12)",
     });
   });
 
