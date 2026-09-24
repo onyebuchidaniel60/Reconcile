@@ -1,9 +1,19 @@
 // Design tokens — typography (design.md §4). Geometric sans (Inter)
 // everywhere; no serifs, no display fonts, no mixed families.
 
-export const fontFamily = "Inter";
-
 export type FontWeight = "300" | "400" | "500" | "600" | "700" | "800";
+
+// Expo registers one font family per weight file, so components resolve the
+// family from the weight through this map. A bare "Inter" matches no loaded
+// family and falls back to a serif on web.
+export const fontFamilyForWeight: Record<FontWeight, string> = {
+  "300": "Inter_300Light",
+  "400": "Inter_400Regular",
+  "500": "Inter_500Medium",
+  "600": "Inter_600SemiBold",
+  "700": "Inter_700Bold",
+  "800": "Inter_800ExtraBold",
+};
 
 export interface TypeRole {
   fontSize: number;

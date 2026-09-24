@@ -1,6 +1,6 @@
 import { Text as RNText, type StyleProp, type TextStyle } from "react-native";
 import { colors, type ColorName } from "../theme/colors";
-import { fontFamily, type TypeRole } from "../theme/type";
+import { fontFamilyForWeight, type TypeRole } from "../theme/type";
 import * as roles from "../theme/type";
 
 export type TextRole =
@@ -53,7 +53,7 @@ export function Text({
     <RNText
       style={[
         {
-          fontFamily,
+          fontFamily: fontFamilyForWeight[roleStyle.fontWeight],
           fontSize: roleStyle.fontSize,
           lineHeight: roleStyle.lineHeight,
           fontWeight: roleStyle.fontWeight,

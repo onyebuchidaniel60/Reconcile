@@ -4,6 +4,7 @@ import {
   body,
   display,
   displayXl,
+  fontFamilyForWeight,
   h1,
   h2,
   h3,
@@ -86,6 +87,17 @@ describe("design tokens (design.md §3–§5, §9)", () => {
     expect(titleHeavy.fontWeight).toBe("700");
     expect(titleLight.fontSize).toBe(titleHeavy.fontSize);
     expect(titleLight.lineHeight).toBe(titleHeavy.lineHeight);
+  });
+
+  it("resolves every weight to a loaded Inter family", () => {
+    expect(fontFamilyForWeight).toEqual({
+      "300": "Inter_300Light",
+      "400": "Inter_400Regular",
+      "500": "Inter_500Medium",
+      "600": "Inter_600SemiBold",
+      "700": "Inter_700Bold",
+      "800": "Inter_800ExtraBold",
+    });
   });
 
   it("exports the spacing and radius scales", () => {
