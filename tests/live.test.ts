@@ -7,7 +7,12 @@ import { describe, expect, it } from "@jest/globals";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import * as http from "node:http";
 import * as https from "node:https";
-import { periodSpend, remainingBudget } from "../supabase/functions/_shared/finance";
+import {
+  hasHistory,
+  periodSpend,
+  remainingBudget,
+  topMerchant,
+} from "../supabase/functions/_shared/finance";
 
 type FetchHeaders =
   | Record<string, string>
@@ -281,4 +286,189 @@ describeLive("live integration (RLS + sync idempotency)", () => {
       await admin.auth.admin.deleteUser(userB);
     }
   }, 120000);
+
+  it("learns merchant rules, answers ask, and renders insights data", async () => {
+    const admin = adminClient();
+    const stamp = Date.now();
+    const email = `slice2-${stamp}@example.com`;
+    const password = `Test-${stamp}-x!`;
+
+    const { data: created, error: createError } =
+      await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+    if (createError || !created.user) {
+      throw new Error(`setup failed: ${JSON.stringify(createError)}`);
+    }
+    const userId = created.user.id;
+
+    try {
+      const client = anonClient();
+      const { error: signInError } = await client.auth.signInWithPassword({
+        email,
+        password,
+      });
+      expect(signInError).toBeNull();
+
+      // Demo-mode connection (the previously failing path).
+      const { data: conn, error: connError } = await client.functions.invoke(
+        "bank-connect-session",
+        { body: { provider_id: "demo" } },
+      );
+      expect(connError).toBeNull();
+      expect(conn.accounts).toHaveLength(3);
+      const sync = await client.functions.invoke("bank-sync", {
+        body: { bank_connection_id: conn.connection.id, mode: "initial" },
+      });
+      expect(sync.error).toBeNull();
+      expect(sync.data.added).toBeGreaterThan(0);
+
+      // Two confirmations of the same merchant/category → learned rule.
+      const { data: pending } = await client
+        .from("transaction_reviews")
+        .select("transaction_id,transactions!inner(normalized_merchant)")
+        .eq("status", "needs_review")
+        .limit(60);
+      const byMerchant = new Map<string, string[]>();
+      for (const r of ((pending ?? []) as unknown as {
+        transaction_id: string;
+        transactions: { normalized_merchant: string };
+      }[])) {
+        const list = byMerchant.get(r.transactions.normalized_merchant) ?? [];
+        list.push(r.transaction_id);
+        byMerchant.set(r.transactions.normalized_merchant, list);
+      }
+      const group = [...byMerchant.entries()].find(([, ids]) => ids.length >= 2);
+      expect(group).toBeDefined();
+      const [merchantKey, txnIds] = group as [string, string[]];
+      for (const txnId of txnIds.slice(0, 2)) {
+        const { error } = await client
+          .from("transaction_reviews")
+          .update({
+            status: "reconciled",
+            category_id: "transport",
+            confirmed_at: new Date().toISOString(),
+            source: "user:confirm",
+          })
+          .eq("transaction_id", txnId);
+        expect(error).toBeNull();
+      }
+      // Same counting rule the app applies on confirm.
+      const { data: confirmed } = await client
+        .from("transaction_reviews")
+        .select("transaction_id,category_id,transactions!inner(normalized_merchant)")
+        .eq("status", "reconciled")
+        .eq("category_id", "transport")
+        .like("source", "user:%");
+      const matching = ((confirmed ?? []) as unknown as {
+        transactions: { normalized_merchant: string };
+      }[]).filter((r) => r.transactions.normalized_merchant === merchantKey);
+      expect(matching.length).toBeGreaterThanOrEqual(2);
+      const { error: ruleError } = await client.from("merchant_rules").upsert(
+        {
+          user_id: userId,
+          merchant_key: merchantKey,
+          category_id: "transport",
+          created_from: "confirmed-twice",
+          confidence: 1.0,
+        },
+        { onConflict: "user_id,merchant_key", ignoreDuplicates: true },
+      );
+      expect(ruleError).toBeNull();
+      const { data: rule } = await client
+        .from("merchant_rules")
+        .select("category_id")
+        .eq("user_id", userId)
+        .eq("merchant_key", merchantKey)
+        .maybeSingle();
+      expect((rule as { category_id: string } | null)?.category_id).toBe(
+        "transport",
+      );
+
+      // Fresh suggestion after rule creation uses the learned rule.
+      const victim = txnIds[0];
+      await admin.from("transaction_reviews").delete().eq("transaction_id", victim);
+      const resync = await client.functions.invoke("bank-sync", {
+        body: { bank_connection_id: conn.connection.id, mode: "manual" },
+      });
+      expect(resync.error).toBeNull();
+      expect(resync.data.added).toBe(0);
+      const { data: resuggested } = await client
+        .from("transaction_reviews")
+        .select("category_id,source")
+        .eq("transaction_id", victim)
+        .maybeSingle();
+      expect(
+        (resuggested as { category_id: string } | null)?.category_id,
+      ).toBe("transport");
+      expect((resuggested as { source: string } | null)?.source).toBe(
+        "suggestion:user_rule",
+      );
+
+      // Ask Reconcile answers from the user's own data.
+      const spendQ = await client.functions.invoke("ai-ask", {
+        body: { question: "How much did I spend this month?" },
+      });
+      expect(spendQ.error).toBeNull();
+      expect(spendQ.data.intent).toBe("spend_summary");
+      expect(spendQ.data.answer).toMatch(/₦/);
+      expect(spendQ.data.basis).toMatch(/^based on: /);
+      const noQ = await client.functions.invoke("ai-ask", {
+        body: { question: "What is the weather?" },
+      });
+      expect(noQ.error).toBeNull();
+      expect(noQ.data.intent).toBe("unsupported");
+      expect(noQ.data.answer).toMatch(/can't answer that yet/);
+
+      // Insights inputs render from live data.
+      const { data: ledger } = await client
+        .from("transactions")
+        .select(
+          "id,semantic_type,amount_minor,occurred_at,budget_eligible,normalized_merchant,merchant_name",
+        );
+      const { data: reviews } = await client
+        .from("transaction_reviews")
+        .select("transaction_id,category_id");
+      const categoryByTxn = new Map(
+        ((reviews ?? []) as { transaction_id: string; category_id: string }[]).map(
+          (r) => [r.transaction_id, r.category_id] as const,
+        ),
+      );
+      const now = new Date();
+      const curStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+      const rows = ((ledger ?? []) as {
+        id: string;
+        semantic_type: "expense";
+        amount_minor: number;
+        occurred_at: string;
+        budget_eligible: boolean;
+        normalized_merchant: string;
+        merchant_name: string;
+      }[]).map((r) => ({
+        semanticType: r.semantic_type,
+        categoryId: categoryByTxn.get(r.id) ?? undefined,
+        merchantKey: r.normalized_merchant,
+        merchantName: r.merchant_name,
+        amountMinor: r.amount_minor,
+        occurredAtMs: Date.parse(r.occurred_at),
+        budgetEligible: r.budget_eligible,
+      }));
+      expect(hasHistory(rows, prevStart, curStart)).toBe(true);
+      const top = topMerchant(rows, curStart, Date.now());
+      expect(top).not.toBeNull();
+      expect(top?.totalMinor).toBeGreaterThan(0);
+    } finally {
+      await admin.from("transaction_reviews").delete().eq("user_id", userId);
+      await admin.from("merchant_rules").delete().eq("user_id", userId);
+      await admin.from("budgets").delete().eq("user_id", userId);
+      await admin.from("transactions").delete().eq("user_id", userId);
+      await admin.from("bank_accounts").delete().eq("user_id", userId);
+      await admin.from("bank_connections").delete().eq("user_id", userId);
+      await admin.from("sync_runs").delete().eq("user_id", userId);
+      await admin.auth.admin.deleteUser(userId);
+    }
+  }, 180000);
 });

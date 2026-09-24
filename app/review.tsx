@@ -1,54 +1,68 @@
 import { Link } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { formatMinor } from "../supabase/functions/_shared/finance";
+import {
+  flagAmbiguousTransfers,
+  formatMinor,
+} from "../supabase/functions/_shared/finance";
 import {
   confirmReview,
   excludeReview,
   getCategories,
   getPendingReviews,
+  getTransactions,
   type Category,
   type ReviewItem,
+  type Transaction,
 } from "../src/lib/db";
 
 export default function ReviewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<ReviewItem[]>([]);
+  const [ledger, setLedger] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    const [reviews, cats] = await Promise.all([
+    const [reviews, cats, txns] = await Promise.all([
       getPendingReviews(),
       getCategories(),
+      getTransactions(500),
     ]);
-    return { reviews, cats };
+    return { reviews, cats, txns };
   }, []);
+
+  const applyData = useCallback(
+    (reviews: ReviewItem[], cats: Category[], txns: Transaction[]) => {
+      setItems(reviews);
+      setCategories(cats);
+      setLedger(txns);
+    },
+    [],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { reviews, cats } = await fetchData();
-      setItems(reviews);
-      setCategories(cats);
+      const { reviews, cats, txns } = await fetchData();
+      applyData(reviews, cats, txns);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load reviews.");
     } finally {
       setLoading(false);
     }
-  }, [fetchData]);
+  }, [fetchData, applyData]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const { reviews, cats } = await fetchData();
+        const { reviews, cats, txns } = await fetchData();
         if (!active) return;
-        setItems(reviews);
-        setCategories(cats);
+        applyData(reviews, cats, txns);
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Could not load reviews.");
@@ -59,7 +73,21 @@ export default function ReviewScreen() {
     return () => {
       active = false;
     };
-  }, [fetchData]);
+  }, [fetchData, applyData]);
+
+  const flagById = useMemo(() => {
+    const flags = flagAmbiguousTransfers(
+      ledger.map((t) => ({
+        id: t.id,
+        bankAccountId: t.bank_account_id,
+        direction: t.direction as "credit" | "debit",
+        amountMinor: t.amount_minor,
+        occurredAtMs: Date.parse(t.occurred_at),
+        semanticType: t.semantic_type as "expense",
+      })),
+    );
+    return new Map(flags.map((f) => [f.id, f.reason] as const));
+  }, [ledger]);
 
   const confirm = async (item: ReviewItem) => {
     const categoryId = picked[item.transaction_id] ?? item.category_id ?? "other";
@@ -122,6 +150,9 @@ export default function ReviewScreen() {
                 <Text>
                   {t.occurred_at.slice(0, 10)} · {t.semantic_type}
                 </Text>
+                {flagById.get(t.id) ? (
+                  <Text>Flag: {flagById.get(t.id)} — stays in review.</Text>
+                ) : null}
                 <Text>Suggested: {selected}</Text>
                 {categories.map((c) => (
                   <Pressable

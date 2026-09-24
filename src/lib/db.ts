@@ -2,6 +2,10 @@
 // privileged writes go through Edge Functions. No raw SQL, no raw fetch,
 // no function URLs outside this module.
 import { getSupabase } from "./supabase";
+import {
+  countMatchingConfirmations,
+  shouldCreateRule,
+} from "../../supabase/functions/_shared/finance";
 
 export interface BankConnection {
   id: string;
@@ -147,6 +151,20 @@ export async function disconnectConnection(connectionId: string): Promise<void> 
   if (error) throw new Error(friendly(error, "Disconnect failed."));
 }
 
+export interface AskResult {
+  intent: string;
+  answer: string;
+  basis: string;
+}
+
+export async function askQuestion(question: string): Promise<AskResult> {
+  const { data, error } = await getSupabase().functions.invoke("ai-ask", {
+    body: { question },
+  });
+  if (error) throw new Error(friendly(error, "Could not answer that question."));
+  return data as AskResult;
+}
+
 export async function getPendingReviews(): Promise<ReviewItem[]> {
   const { data, error } = await getSupabase()
     .from("transaction_reviews")
@@ -201,7 +219,8 @@ export async function confirmReview(
   categoryId: string,
   userNote?: string,
 ): Promise<void> {
-  const { error } = await getSupabase()
+  const supabase = getSupabase();
+  const { error } = await supabase
     .from("transaction_reviews")
     .update({
       status: "reconciled",
@@ -212,6 +231,62 @@ export async function confirmReview(
     })
     .eq("transaction_id", transactionId);
   if (error) throw new Error(friendly(error, "Could not confirm review."));
+  await maybeLearnMerchantRule(transactionId, categoryId);
+}
+
+/**
+ * Learned merchant rules: when the same merchant/category pair has been
+ * confirmed twice (including this one), store a merchant_rules row so
+ * future matches auto-suggest that category. Best-effort: failures here
+ * never fail the confirmation itself.
+ */
+async function maybeLearnMerchantRule(
+  transactionId: string,
+  categoryId: string,
+): Promise<void> {
+  try {
+    const supabase = getSupabase();
+    const userId = await currentUserId();
+    const { data: txn } = await supabase
+      .from("transactions")
+      .select("normalized_merchant")
+      .eq("id", transactionId)
+      .maybeSingle();
+    const merchantKey = (txn as { normalized_merchant?: string } | null)
+      ?.normalized_merchant;
+    if (!merchantKey) return;
+    const { data } = await supabase
+      .from("transaction_reviews")
+      .select("transaction_id,category_id,transactions!inner(normalized_merchant)")
+      .eq("user_id", userId)
+      .eq("status", "reconciled")
+      .like("source", "user:%");
+    const confirmations = ((data ?? []) as unknown as {
+      category_id: string;
+      transactions: { normalized_merchant: string };
+    }[]).map((r) => ({
+      merchantKey: r.transactions.normalized_merchant,
+      categoryId: r.category_id,
+    }));
+    if (
+      shouldCreateRule(
+        countMatchingConfirmations(confirmations, merchantKey, categoryId),
+      )
+    ) {
+      await supabase.from("merchant_rules").upsert(
+        {
+          user_id: userId,
+          merchant_key: merchantKey,
+          category_id: categoryId,
+          created_from: "confirmed-twice",
+          confidence: 1.0,
+        },
+        { onConflict: "user_id,merchant_key", ignoreDuplicates: true },
+      );
+    }
+  } catch {
+    // Best-effort only; confirmation already succeeded.
+  }
 }
 
 export async function excludeReview(transactionId: string): Promise<void> {

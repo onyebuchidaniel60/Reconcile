@@ -64,6 +64,8 @@ export default function RootLayout() {
             <Stack.Screen name="activity" options={{ title: "Activity" }} />
             <Stack.Screen name="budget-setup" options={{ title: "Budget setup" }} />
             <Stack.Screen name="budget" options={{ title: "Budget" }} />
+            <Stack.Screen name="insights" options={{ title: "Insights" }} />
+            <Stack.Screen name="ask" options={{ title: "Ask Reconcile" }} />
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
           </Stack>
         </AuthGate>

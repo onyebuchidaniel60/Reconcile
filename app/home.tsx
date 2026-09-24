@@ -154,6 +154,8 @@ export default function HomeScreen() {
         />
       )}
       <Link href="/activity">All activity</Link>
+      <Link href="/insights">Insights</Link>
+      <Link href="/ask">Ask Reconcile</Link>
       <Link href="/settings">Settings</Link>
     </View>
   );

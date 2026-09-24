@@ -232,6 +232,8 @@ export function dedupeKey(
 export interface SpendRow {
   semanticType: SemanticType;
   categoryId?: string;
+  merchantKey?: string;
+  merchantName?: string;
   amountMinor: number;
   occurredAtMs: number;
   budgetEligible: boolean;
@@ -298,4 +300,155 @@ export function categorySpend(
     if (row.semanticType === "refund") total -= row.amountMinor;
   }
   return total;
+}
+
+// ---------------------------------------------------------------- insights
+export interface MerchantTotal {
+  key: string;
+  name: string;
+  totalMinor: number;
+}
+
+/** Top merchant by eligible expense spend in the period. Null when none. */
+export function topMerchant(
+  rows: SpendRow[],
+  startMs: number,
+  endMs: number,
+): MerchantTotal | null {
+  const totals = new Map<string, { name: string; total: number }>();
+  for (const row of rows) {
+    if (!row.budgetEligible || row.semanticType !== "expense") continue;
+    if (row.occurredAtMs < startMs || row.occurredAtMs >= endMs) continue;
+    const key = row.merchantKey ?? "unknown";
+    const current = totals.get(key) ?? { name: row.merchantName ?? key, total: 0 };
+    current.total += row.amountMinor;
+    totals.set(key, current);
+  }
+  let best: MerchantTotal | null = null;
+  for (const [key, value] of totals) {
+    if (!best || value.total > best.totalMinor) {
+      best = { key, name: value.name, totalMinor: value.total };
+    }
+  }
+  return best;
+}
+
+export interface CategoryChange {
+  categoryId: string;
+  currentMinor: number;
+  previousMinor: number;
+  deltaMinor: number;
+}
+
+/** Category with the largest absolute net-spend change between periods. */
+export function biggestCategoryChange(
+  rows: SpendRow[],
+  curStartMs: number,
+  curEndMs: number,
+  prevStartMs: number,
+  prevEndMs: number,
+): CategoryChange | null {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    if (row.categoryId) ids.add(row.categoryId);
+  }
+  let best: CategoryChange | null = null;
+  for (const id of ids) {
+    const currentMinor = categorySpend(rows, id, curStartMs, curEndMs);
+    const previousMinor = categorySpend(rows, id, prevStartMs, prevEndMs);
+    if (currentMinor === 0 && previousMinor === 0) continue;
+    const deltaMinor = currentMinor - previousMinor;
+    if (!best || Math.abs(deltaMinor) > Math.abs(best.deltaMinor)) {
+      best = { categoryId: id, currentMinor, previousMinor, deltaMinor };
+    }
+  }
+  return best;
+}
+
+/** Whether the period contains any eligible expense/refund activity. */
+export function hasHistory(rows: SpendRow[], startMs: number, endMs: number): boolean {
+  return rows.some(
+    (row) =>
+      row.budgetEligible &&
+      (row.semanticType === "expense" || row.semanticType === "refund") &&
+      row.occurredAtMs >= startMs &&
+      row.occurredAtMs < endMs,
+  );
+}
+
+// ------------------------------------------------- ambiguous transfers
+export interface AmbiguityFlag {
+  id: string;
+  reason: string;
+}
+
+const AMBIGUOUS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Near-miss transfer pairs that fail high-confidence criteria stay
+ * reviewable, flagged with a reason. Exact high-confidence pairs are the
+ * sync's job and are never flagged here. Each transaction flagged once.
+ */
+export function flagAmbiguousTransfers(
+  rows: TransferCandidate[],
+): AmbiguityFlag[] {
+  const sane = rows.filter(
+    (r) =>
+      Number.isInteger(r.amountMinor) &&
+      r.amountMinor > 0 &&
+      Number.isFinite(r.occurredAtMs),
+  );
+  const debits = sane.filter((r) => r.direction === "debit");
+  const credits = sane.filter((r) => r.direction === "credit");
+  const flags: AmbiguityFlag[] = [];
+  const flagged = new Set<string>();
+  const flag = (id: string, reason: string): void => {
+    if (!flagged.has(id)) {
+      flagged.add(id);
+      flags.push({ id, reason });
+    }
+  };
+  for (const debit of debits) {
+    for (const credit of credits) {
+      if (credit.bankAccountId === debit.bankAccountId) continue;
+      const gap = Math.abs(credit.occurredAtMs - debit.occurredAtMs);
+      const sameAmount = credit.amountMinor === debit.amountMinor;
+      // Exact pairs inside the high-confidence window are the sync's job.
+      if (sameAmount && gap <= TRANSFER_WINDOW_MS) continue;
+      const closeAmount =
+        !sameAmount &&
+        Math.abs(credit.amountMinor - debit.amountMinor) / debit.amountMinor <= 0.02;
+      if (closeAmount && gap <= TRANSFER_WINDOW_MS) {
+        const reason = "Possible transfer: amount differs slightly";
+        flag(debit.id, reason);
+        flag(credit.id, reason);
+      } else if (gap > TRANSFER_WINDOW_MS && gap <= AMBIGUOUS_WINDOW_MS) {
+        const reason = "Possible transfer: dates differ";
+        flag(debit.id, reason);
+        flag(credit.id, reason);
+      }
+    }
+  }
+  return flags;
+}
+
+// ------------------------------------------------------- learned rules
+export interface ConfirmedReview {
+  merchantKey: string;
+  categoryId: string;
+}
+
+export function countMatchingConfirmations(
+  reviews: ConfirmedReview[],
+  merchantKey: string,
+  categoryId: string,
+): number {
+  return reviews.filter(
+    (r) => r.merchantKey === merchantKey && r.categoryId === categoryId,
+  ).length;
+}
+
+/** A merchant/category pair confirmed twice becomes a learned rule. */
+export function shouldCreateRule(matchingConfirmations: number): boolean {
+  return matchingConfirmations >= 2;
 }
