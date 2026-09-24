@@ -2,11 +2,12 @@
 // Revokes a user-owned connection and its accounts. Data is retained;
 // deletion flows arrive in a later phase.
 import { requireUser } from "../_shared/auth.ts";
+import { json, preflight } from "../_shared/cors.ts";
 import { errResponse } from "../_shared/envelope.ts";
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: cors() });
+    return preflight();
   }
   if (req.method !== "POST") {
     return errResponse(405, "METHOD_NOT_ALLOWED", "Use POST.", false);
@@ -47,14 +48,3 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   return json({ ok: true });
 });
-
-function cors(): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, content-type",
-  };
-}
-
-function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: cors() });
-}

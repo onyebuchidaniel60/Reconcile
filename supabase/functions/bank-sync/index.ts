@@ -5,6 +5,7 @@
 // create review state → detect internal transfers → write sync_runs row.
 // Idempotent: re-running inserts zero new transactions.
 import { requireUser } from "../_shared/auth.ts";
+import { json, preflight } from "../_shared/cors.ts";
 import { buildDemoDataset } from "../_shared/demo.ts";
 import { errResponse } from "../_shared/envelope.ts";
 import {
@@ -16,7 +17,7 @@ import {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: cors() });
+    return preflight();
   }
   if (req.method !== "POST") {
     return errResponse(405, "METHOD_NOT_ALLOWED", "Use POST.", false);
@@ -250,15 +251,4 @@ function accountIdByKey(
   key: string,
 ): string | undefined {
   return byProvider[`demo_${key}_${userId.slice(0, 8)}`];
-}
-
-function cors(): HeadersInit {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "authorization, content-type",
-  };
-}
-
-function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: cors() });
 }

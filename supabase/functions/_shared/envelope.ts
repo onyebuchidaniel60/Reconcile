@@ -1,5 +1,7 @@
 // Stable error envelope per ARCHITECTURE.md §8.
-// Pure (no imports): usable in Edge Functions, the app, and unit tests.
+// Imports only the pure CORS helper: usable in Edge Functions, the app,
+// and unit tests.
+import { corsHeaders } from "./cors.ts";
 
 export interface ErrorEnvelope {
   error: {
@@ -26,5 +28,8 @@ export function errResponse(
   message: string,
   retryable: boolean,
 ): Response {
-  return Response.json(err(code, message, retryable), { status });
+  return Response.json(err(code, message, retryable), {
+    status,
+    headers: corsHeaders(),
+  });
 }
