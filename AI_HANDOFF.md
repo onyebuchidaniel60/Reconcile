@@ -192,6 +192,53 @@
   motion; `supabase/` untouched; SKILL_FRONTEND_DESIGN.md remains unwritten
   (earned at Phase 10).
 
+## Phase 5 checkpoint (wave 4–5, charts, motion)
+- Commits: `9237151 feat: add wave 4-5 components, charts, and motion
+  helpers (Phase 5)` (11 components, 4 motion helpers, gallery, tests,
+  deps) and `fe163a3 fix: correct donut arcs, bar axis gutter, and gallery
+  sections` (visual-pass fixes + re-verified screenshots).
+- Wave 4: `CategoryCircle.tsx` (40px tinted circle, 20px lucide outline icon,
+  category-name label), `Starburst.tsx` (12-point SVG, 3 colors, 32/48/64,
+  alert text, 180ms pop), `ProgressBar.tsx` (line 60% track, ink/yellow
+  fill variants, white pill label, animated width), `PillBadge.tsx`
+  (dark/light).
+- Wave 5: `HatchPattern.tsx` (45°/2px/4px ink, useId-sanitized unique ids),
+  `ChartAxis.tsx` (x/y, line 40%, small 60% labels), `ChartLegend.tsx`
+  (two-column dot/label/value), `ChartTextEquivalent.tsx` (visually hidden,
+  screen-reader reachable), `Donut.tsx` (ink + hatch arcs, h2 center total,
+  legend), `BarChart.tsx` (ink/yellow/hatched rects, one-hatched validator,
+  Y-gutter axis, starburst callout, 40ms stagger), `LineChart.tsx` (yellow
+  3px polyline, 8px markers, dashed projection, paper corner starburst).
+  No SVG text anywhere; every chart wires its description into its own
+  accessibilityLabel.
+- Motion: `src/lib/motion/` (`usePressScale` returning component+style+
+  handlers, `useCardEntrance` with capped stagger, `useConfirmPulse`,
+  `useChartReveal`); `Button` refactored to zero Reanimated/haptics imports.
+  Haptics `confirm`/`select`/`destroy` confirmed present, unchanged.
+- New token: `spacing.xxs` (6px pill/chip padding, documented in spacing.ts).
+- Gallery: Wave 4/5 sections, motion demos with dev-only reduced-motion
+  toggle (threaded via `MotionOptions` override), replayable chart reveal.
+  Gating unchanged; production still hides dev routes (flag
+  `EXPO_PUBLIC_ENABLE_DEV_ROUTES` is NOT set in Vercel — operator may set
+  it; verified "Not available" anon and authed).
+- Token check: 0 violations, no exemptions. Checks: `tsc` 0, `eslint` 0,
+  `npm test` 78 passed / 2 live-skipped, `expo export` 19 routes.
+- Gallery pass (second run clean): all sections render 375 + 1280, motion
+  demos fire, toggle works, console empty, no 4xx. Screenshots
+  `docs/browser-tools/phase5-{gallery-375,gallery-1280,gallery-reduced,
+  section-wave4,section-charts,section-motion,donut,charts-reduced}.png`.
+  Defects found and fixed: invisible donut hatch (two-arc restructure +
+  resize), bar tick/month label collision (Y gutter), serif proof re-done.
+  Demo loop untouched by these changes; regression re-verified post-fix
+  via the same pass.
+- Deploy: production `https://reconcile-91et10ps4-uhhh2.vercel.app`
+  (alias `reconcile-two-tau.vercel.app`), READY; HTTP 200 on `/` and
+  `/dev/primitives`; bundle contains exactly one match equal to the project
+  URL; secrets scans zero; protection OFF.
+- No screen restyled; no Wave 6+ components or organisms; no UI framework;
+  `supabase/` untouched; SKILL_FRONTEND_DESIGN.md remains unwritten
+  (earned at Phase 10).
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
