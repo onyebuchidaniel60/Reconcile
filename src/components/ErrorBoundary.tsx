@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radii, spacing, typography } from "../theme/tokens";
+import { body, colors, h2, radius, spacing } from "../theme";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -62,29 +62,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing.lg,
+    padding: spacing.xl,
   },
   title: {
-    fontSize: typography.titleSize,
-    fontWeight: "700",
+    fontSize: h2.fontSize,
+    fontWeight: h2.fontWeight,
     color: colors.ink,
     textAlign: "center",
   },
   subtitle: {
     marginTop: spacing.sm,
-    fontSize: typography.bodySize,
+    fontSize: body.fontSize,
     color: colors.ink,
     textAlign: "center",
   },
   button: {
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.pill,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.pill,
     backgroundColor: colors.signalYellow,
   },
   buttonLabel: {
-    fontSize: typography.bodySize,
+    fontSize: body.fontSize,
     fontWeight: "700",
     color: colors.ink,
   },

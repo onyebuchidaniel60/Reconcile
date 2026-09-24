@@ -1,9 +1,21 @@
+import {
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+  useFonts,
+} from "@expo-google-fonts/inter";
 import { Stack, useRouter, useSegments } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { Text, View } from "react-native";
 import { ErrorBoundary } from "../src/components/ErrorBoundary";
 import { SessionProvider, useSession } from "../src/lib/session";
+
+void SplashScreen.preventAutoHideAsync();
 
 const PUBLIC_ROUTES = ["welcome", "privacy", "country", "signup", "signin"];
 
@@ -42,6 +54,27 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  // Phase 3 loads Inter without restyling any screen; the demo renders in
+  // the system font until Inter arrives, then swaps. Font failure falls
+  // through to the system stack rather than blocking the app.
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
   return (
     <ErrorBoundary>
       <SessionProvider>

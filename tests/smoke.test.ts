@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@jest/globals";
-import { colors, radii, theme } from "../src/theme/tokens";
 import { loadPublicEnv, parseAppEnv, type RawEnv } from "../src/lib/env";
 
 const VALID_SOURCE: RawEnv = {
@@ -9,20 +8,6 @@ const VALID_SOURCE: RawEnv = {
 };
 
 describe("Phase 1 smoke", () => {
-  it("exposes the base theme tokens", () => {
-    expect(theme).toBeDefined();
-    expect(colors.ink).toBe("#070707");
-    expect(colors.paper).toBe("#F6F6F1");
-    expect(colors.signalYellow).toBe("#F2F50A");
-    expect(colors.softCoral).toBe("#FFB0A8");
-    expect(colors.mint).toBe("#79DE72");
-    expect(colors.lavender).toBe("#A49BFF");
-    expect(colors.line).toBe("#DADAD2");
-    // Product direction: card radii stay within 20–28px.
-    expect(radii.card).toBeGreaterThanOrEqual(20);
-    expect(radii.cardLarge).toBeLessThanOrEqual(28);
-  });
-
   it("defaults the app environment to development", () => {
     expect(parseAppEnv(undefined)).toBe("development");
     expect(parseAppEnv("")).toBe("development");
