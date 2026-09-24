@@ -87,6 +87,43 @@
   none of the first user's rows; check 375px and 1280px layouts and a clean
   console/network tab on each screen.
 
+## Slice 2 checkpoint (core demo complete)
+- Fix commit: `74010ed fix: repair demo-mode edge function connectivity`.
+  Root cause: browsers preflight supabase-js calls with `authorization,
+  apikey, content-type, x-client-info`, but functions answered OPTIONS with
+  only `authorization, content-type` and no `Access-Control-Allow-Methods`,
+  so every browser call died as "Failed to send a request to the Edge
+  Function" (native fetch has no CORS, which is why tests passed). Fix: a
+  shared `_shared/cors.ts` helper used by all functions including the error
+  envelope. Verified by curl preflight + an authenticated throwaway-user
+  connect call returning connection + 3 accounts.
+- Slice 2 commit: `9a02e6e feat: core demo slice 2 — insights, ask
+  reconcile, rules, ambiguous transfers`.
+- Scope delivered: deterministic Insights (month compare, biggest category
+  change, top merchant, first-month state); Ask Reconcile via new `ai-ask`
+  Edge Function (five fixed patterns + unsupported state, session-scoped
+  tools, grounding "based on" line, no LLM); learned merchant rules (second
+  same-merchant/category confirm creates a `merchant_rules` row; next sync
+  auto-suggests via `suggestion:user_rule`); ambiguous near-miss transfers
+  stay in review with a visible flag; loading/empty/error + retry states on
+  all screens including Insights and Ask.
+- Live-test bugs caught and fixed: invalid `refund` suggestion category
+  silently voiding review batches (removed; merchant rules win); snake_case
+  `amount_minor` misread as camelCase causing 6 bogus transfer pairs (plus a
+  matcher malformed-row guard); budget insert RLS failure (migration 000002
+  defaults + explicit id); jest-expo stubbed fetch (node:http fetch shim).
+- Checks on the final tree: `tsc` 0, `eslint` 0, `jest` 10 suites 41/41
+  (both live tests green), `expo export -p web` 18 routes, secret scans zero.
+- Deploy: production `https://reconcile-jhmath5cq-uhhh2.vercel.app`
+  (alias `reconcile-two-tau.vercel.app`), READY; HTTP 200 with Expo root;
+  deployed bundle contains exactly one match equal to the project URL;
+  Deployment Protection verified OFF.
+- Stubbed/deferred: interactive agent-as-user pass (no browser tools —
+  HTTP/bundle checks + live E2E instead); visual design system, charts,
+  motion, Mono/OpenAI/RevenueCat/webhooks/CSV (later phases).
+- Status: core demo loop deployed and verified as far as automation allows;
+  NOT verified by agent-as-user (no browser tools).
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
