@@ -144,6 +144,54 @@
 - SKILL_FRONTEND_DESIGN.md is intentionally unwritten. It will be earned
   from the full frontend phase, per frontend-implementation-plan.md §16.
 
+## Phase 4 checkpoint (wave 1–3 primitives)
+- Commits this turn: `388c103 feat: add wave 1-3 primitives and dev
+  gallery (Phase 4)` (10 primitives, haptics helper, barrel, gallery,
+  tests, setup mock, token test, colors/motion additions, eslint/jest
+  config, deps) and `36d5ca7 fix: resolve Inter family per weight for web
+  rendering` (family map, Text fix, map test, re-verified gallery
+  screenshots). Phase 3 files (`3120a3c`, `fafca13`) already pushed.
+- Primitives built: `src/components/Text.tsx` (role prop, all 10 roles),
+  `PairedTitle.tsx` (first/second props, light 300 + heavy 700),
+  `Button.tsx` (primary/secondary/ghost, 56/48px, pill radius, press scale
+  0.97 over press duration + light haptic, 40% disabled),
+  `IconButton.tsx` (44×44 circular, required label),
+  `Input.tsx` (56px, compact radius, label-above, focus/error states),
+  `Chip.tsx` (chip radius, selected yellow, selection haptic),
+  `Card.tsx` (6 surfaces, card/compact radii, padding 20 default),
+  `Divider.tsx`, `SectionHeader.tsx` (h2 + 70%-ink action),
+  `Skeleton.tsx` (line at 60%, pulse collapses under reduced motion),
+  `index.ts` barrel; haptics helper `src/lib/haptics/index.ts`
+  (`confirm`/`select`/`destroy`, failures swallowed).
+- Derived tokens added for §7 pressables: `iconButton #E8E8E3`,
+  `inkOverlay10`, `paperOverlay12`. Title ships as `titleLight`+`titleHeavy`
+  pair; families resolve per weight via `fontFamilyForWeight` (a bare
+  "Inter" matches no loaded family — caught by the gallery pass rendering
+  serif, fixed and re-verified in Inter).
+- Gallery: `app/dev/primitives.tsx` (all primitives × variants, tokens only,
+  unlinked). Gated by `EXPO_PUBLIC_APP_ENV !== 'production'` or
+  `EXPO_PUBLIC_ENABLE_DEV_ROUTES=true`; production renders "Not available"
+  (verified anon and authed). Operator: set the flag if dev routes should be
+  visible on the deployed URL.
+- Token check enforcing: `npm test` now runs `jest && npm run check:tokens`;
+  current count is 0 violations (no exemption needed); `app/dev` is scanned.
+- Browser tools: self-provisioned Playwright 1.63.0 + headless Chromium
+  (no MCP/browser-use tool in this environment). Gallery pass: all
+  primitives render at 375×812 and 1280×800, button press/chip toggle
+  (yellow fill verified)/input fill/section action all fire, console empty,
+  no 4xx. Screenshots `docs/browser-tools/phase4-gallery-*.png`,
+  `phase4-home.png`. Two defects found and fixed: deep-link 404s
+  (`cleanUrls: true` in vercel.json) and serif fallback (family-per-weight).
+  Second pass clean. Demo regression clean (sign-in → sync → confirm →
+  insights with real numbers → grounded ask answer).
+- Deploy: production `https://reconcile-e05lj9uyk-uhhh2.vercel.app`
+  (alias `reconcile-two-tau.vercel.app`), HTTP 200, bundle contains the
+  project URL, secrets scans zero, protection OFF.
+- No screen restyled (only import repoints where the old theme was deleted);
+  no Wave 4+ components; no motion library beyond Button press/reduced
+  motion; `supabase/` untouched; SKILL_FRONTEND_DESIGN.md remains unwritten
+  (earned at Phase 10).
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
