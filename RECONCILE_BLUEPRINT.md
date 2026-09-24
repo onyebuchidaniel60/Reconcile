@@ -327,20 +327,31 @@ Server-only:
 
 ## 24. Phased implementation plan
 
-1. Mobile foundation.
-2. Design system/app shell.
-3. Authentication.
-4. Provider abstraction.
-5. Demo/trust onboarding.
-6. Mono sandbox.
-7. Transaction sync/reconciliation.
-8. Budget engine.
-9. Insights/AI.
-10. RevenueCat.
-11. Privacy/security hardening.
-12. E2E/store/Shipaton release.
+The plan is frontend-first per `SKILL_LEAN_DELIVERY.md` Stage 4. The authoritative
+phase list is `IMPLEMENTATION_PLAN.md` v2.
 
-Every phase stops after verification and commit.
+**Completed:**
+- Phase 0 — Blueprint
+- Phase 1 — Mobile foundation
+- Phase 2 — Core demo (tagged `demo-v1`)
+
+**Full build:**
+- Phase 3 — Design tokens
+- Phase 4 — Wave 1–3 primitives
+- Phase 5 — Wave 4–5: charts, accent, motion, haptics
+- Phase 6 — Wave 6–7: rows, states, shells, navigation
+- Phase 7 — Wave 8: feature organisms
+- Phase 8 — Screen rebuild: onboarding, auth, Home, Review
+- Phase 9 — Screen rebuild: Activity, Detail, Budget, Insights, Ask, Settings
+- Phase 10 — Browser agent-as-user pass + `SKILL_FRONTEND_DESIGN.md` v1
+- Phase 11 — Mono integration
+- Phase 12 — RevenueCat monetization
+- Phase 13 — Real AI (OpenAI)
+- Phase 14 — Security hardening and deletion
+- Phase 15 — E2E, store packaging, Shipaton release
+
+Every phase ends with the same protocol: implement → test → inspect → deploy →
+agent-as-user pass → fix → update `AI_HANDOFF.md` → commit → STOP.
 
 ## 25–29. Handoff documents
 
