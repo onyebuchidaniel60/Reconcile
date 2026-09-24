@@ -3,7 +3,7 @@ import { View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, {
   useAnimatedProps,
 } from "react-native-reanimated";
-import Svg, { Circle, Defs, Path } from "react-native-svg";
+import Svg, { Defs, Path } from "react-native-svg";
 import { useChartReveal } from "../lib/motion/useChartReveal";
 import { colors } from "../theme/colors";
 import { formatMinor } from "../../supabase/functions/_shared/finance";
@@ -12,22 +12,23 @@ import { ChartTextEquivalent } from "./ChartTextEquivalent";
 import { HatchPattern, toPatternId } from "./HatchPattern";
 import { Text } from "./Text";
 
-const SIZE = 160;
-const CENTER = 60;
-const RADIUS = 44;
-const STROKE = 16;
+const SIZE = 220;
+const CENTER = 110;
+const RADIUS = 80;
+const STROKE = 22;
 
 function polar(angleDeg: number): [number, number] {
   const radians = ((angleDeg - 90) * Math.PI) / 180;
   return [CENTER + RADIUS * Math.cos(radians), CENTER + RADIUS * Math.sin(radians)];
 }
 
-/** SVG arc path for a 0..1 sweep starting at 12 o'clock. */
-export function describeDonutArc(fraction: number): string {
+/** SVG arc path for a fractional sweep starting at a fractional offset. */
+export function describeDonutArc(fraction: number, startFraction = 0): string {
   const clamped = Math.min(0.9999, Math.max(0.0001, fraction));
+  const start = startFraction * 360;
   const sweep = clamped * 360;
-  const [startX, startY] = polar(0);
-  const [endX, endY] = polar(sweep);
+  const [startX, startY] = polar(start);
+  const [endX, endY] = polar(start + sweep);
   const large = sweep > 180 ? 1 : 0;
   return `M ${startX} ${startY} A ${RADIUS} ${RADIUS} 0 ${large} 1 ${endX} ${endY}`;
 }
@@ -53,8 +54,11 @@ export function Donut({ total, primary, currency, labels, testID, style }: Donut
   const { progress } = useChartReveal();
   const rawId = useId();
   const hatchId = useMemo(() => toPatternId(rawId), [rawId]);
-  const animatedProps = useAnimatedProps(() => ({
-    d: describeDonutArc(clampedPrimary * progress.value),
+  const primaryProps = useAnimatedProps(() => ({
+    d: describeDonutArc(clampedPrimary * progress.value, 0),
+  }));
+  const secondaryProps = useAnimatedProps(() => ({
+    d: describeDonutArc((1 - clampedPrimary) * progress.value, clampedPrimary),
   }));
 
   const totalLabel = formatMinor(total, currency);
@@ -70,21 +74,21 @@ export function Donut({ total, primary, currency, labels, testID, style }: Donut
       style={style}
     >
       <View style={{ alignItems: "center" }}>
-        <Svg width={SIZE} height={SIZE} viewBox="0 0 120 120">
+        <Svg width={SIZE} height={SIZE} viewBox="0 0 220 220">
           <Defs>
             <HatchPattern id={hatchId} />
           </Defs>
-          <Circle
-            cx={CENTER}
-            cy={CENTER}
-            r={RADIUS}
+          <AnimatedPath
+            d={describeDonutArc(0.0001, clampedPrimary)}
+            animatedProps={secondaryProps}
             fill="none"
             stroke={colors.ink}
             strokeWidth={STROKE}
+            strokeLinecap="round"
           />
           <AnimatedPath
-            d={describeDonutArc(0.0001)}
-            animatedProps={animatedProps}
+            d={describeDonutArc(0.0001, 0)}
+            animatedProps={primaryProps}
             fill="none"
             stroke={`url(#${hatchId})`}
             strokeWidth={STROKE}
@@ -105,7 +109,7 @@ export function Donut({ total, primary, currency, labels, testID, style }: Donut
           <Text role="small" color="ink">
             Total
           </Text>
-          <Text role="display">{totalLabel}</Text>
+          <Text role="h2">{totalLabel}</Text>
         </View>
       </View>
       <ChartLegend

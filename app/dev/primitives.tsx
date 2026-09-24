@@ -245,6 +245,7 @@ export default function PrimitivesGallery() {
         <Skeleton height={64} radiusName="compact" testID="gallery-skeleton-tall" />
         <Divider />
 
+        <View testID="gallery-section-wave4">
         <SectionHeader title="Category circles" />
         <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
           {(
@@ -289,8 +290,10 @@ export default function PrimitivesGallery() {
         <SectionHeader title="Pill badges" />
         <PillBadge label="Today" variant="dark" testID="gallery-badge-dark" />
         <PillBadge label="50%" variant="light" testID="gallery-badge-light" />
+        </View>
         <Divider />
 
+        <View testID="gallery-section-charts">
         <SectionHeader title="Charts" />
         <Donut
           total={174700}
@@ -337,8 +340,10 @@ export default function PrimitivesGallery() {
           ]}
           testID="gallery-legend"
         />
+        </View>
         <Divider />
 
+        <View testID="gallery-section-motion">
         <SectionHeader title="Motion (dev only)" />
         <Pressable
           accessibilityRole="button"
@@ -351,6 +356,7 @@ export default function PrimitivesGallery() {
           </Text>
         </Pressable>
         <MotionDemos reduceMotion={reduceMotion} />
+        </View>
       </View>
     </ScrollView>
   );

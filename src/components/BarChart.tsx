@@ -125,6 +125,7 @@ export function BarChart({
     `Bar chart. ` +
     bars.map((bar) => `${bar.label} ${bar.value}`).join(". ") +
     ".";
+  const gutterTicks = [...axisTicks].sort((a, b) => b.value - a.value);
 
   const onLayout = (event: LayoutChangeEvent): void => {
     setMeasuredWidth(event.nativeEvent.layout.width);
@@ -136,51 +137,66 @@ export function BarChart({
       accessibilityLabel={description}
       testID={testID}
       style={style}
-      onLayout={onLayout}
     >
       {calloutText && hatchedIndex >= 0 ? (
         <View style={{ alignItems: "center", marginBottom: spacing.xs }}>
           <Starburst variant="alert-red" size={48} text={calloutText} />
         </View>
       ) : null}
-      <Svg width={measuredWidth} height={height} viewBox={`0 0 ${measuredWidth} ${height}`}>
-        <Defs>
-          <HatchPattern id={hatchId} />
-        </Defs>
-        {bars.map((bar, index) => (
-          <AnimatedBar
-            key={bar.label}
-            offsetX={index * slotWidth}
-            slotWidth={slotWidth}
-            chartHeight={height - 24}
-            ratio={bar.value / max}
-            fill={bar.fill}
-            hatchId={hatchId}
-            delayMs={index * 40}
-            label={bar.label}
-          />
-        ))}
-      </Svg>
-      <View style={{ height: 1, backgroundColor: colors.line, opacity: 0.4 }} />
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          marginTop: spacing.xs,
-        }}
-      >
-        {axisTicks.map((tick) => (
-          <Text key={tick.label} role="small" style={{ opacity: 0.6 }}>
-            {tick.label}
-          </Text>
-        ))}
-      </View>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        {bars.map((bar) => (
-          <Text key={bar.label} role="small" style={{ opacity: 0.6 }}>
-            {bar.label}
-          </Text>
-        ))}
+      <View style={{ flexDirection: "row" }}>
+        {gutterTicks.length > 0 ? (
+          <View
+            style={{
+              justifyContent: "space-between",
+              marginRight: spacing.xs,
+              height: height - 24,
+            }}
+          >
+            {gutterTicks.map((tick) => (
+              <Text key={tick.label} role="small" style={{ opacity: 0.6 }}>
+                {tick.label}
+              </Text>
+            ))}
+          </View>
+        ) : null}
+        <View style={{ flex: 1 }} onLayout={onLayout}>
+          <Svg
+            width={measuredWidth}
+            height={height}
+            viewBox={`0 0 ${measuredWidth} ${height}`}
+          >
+            <Defs>
+              <HatchPattern id={hatchId} />
+            </Defs>
+            {bars.map((bar, index) => (
+              <AnimatedBar
+                key={bar.label}
+                offsetX={index * slotWidth}
+                slotWidth={slotWidth}
+                chartHeight={height - 24}
+                ratio={bar.value / max}
+                fill={bar.fill}
+                hatchId={hatchId}
+                delayMs={index * 40}
+                label={bar.label}
+              />
+            ))}
+          </Svg>
+          <View style={{ height: 1, backgroundColor: colors.line, opacity: 0.4 }} />
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginTop: spacing.xs,
+            }}
+          >
+            {bars.map((bar) => (
+              <Text key={bar.label} role="small" style={{ opacity: 0.6 }}>
+                {bar.label}
+              </Text>
+            ))}
+          </View>
+        </View>
       </View>
       <ChartTextEquivalent description={description} />
     </View>
