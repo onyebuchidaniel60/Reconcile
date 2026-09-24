@@ -40,3 +40,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Vercel CLI link metadata (project/org ids, no secrets)
+.vercel
+# Local secret env files. NOTE: .env.production holds only public
+# EXPO_PUBLIC_* values and IS committed; do not broaden this block.
+.env.local
+.env*.local

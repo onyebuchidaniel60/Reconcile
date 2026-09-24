@@ -1,9 +1,10 @@
 // Client-safe environment handling.
-// Only EXPO_PUBLIC_* keys are ever exposed to the bundle (Expo injects them
-// into `process.env`). Server-only secrets must NEVER use the EXPO_PUBLIC_
-// prefix and are never read here.
-// Reads via `globalThis` so this module stays dependency-free. Access is lazy
-// (`getEnv`) so misconfiguration renders a setup message instead of crashing.
+// Only EXPO_PUBLIC_* keys are ever exposed to the bundle.
+// IMPORTANT: read each key as a direct `process.env.EXPO_PUBLIC_*` member
+// expression. Expo's babel plugin inlines exactly that shape into production
+// bundles (whole-object reads like `process.env` are left as-is and arrive
+// empty on web). Server-only secrets must NEVER use the EXPO_PUBLIC_ prefix
+// and are never read here.
 
 export type AppEnvName = "development" | "staging" | "production";
 
@@ -16,10 +17,11 @@ const APP_ENV_VALUES: readonly AppEnvName[] = [
 export type RawEnv = Record<string, string | undefined>;
 
 function readRawEnv(): RawEnv {
-  const holder = globalThis as {
-    process?: { env?: RawEnv };
+  return {
+    EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+    EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   };
-  return holder.process?.env ?? {};
 }
 
 export function parseAppEnv(raw: string | undefined): AppEnvName {
