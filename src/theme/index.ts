@@ -5,3 +5,4 @@ export * from "./type";
 export * from "./spacing";
 export * from "./radius";
 export * from "./motion";
+export * from "./layout";

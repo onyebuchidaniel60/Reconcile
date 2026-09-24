@@ -1,25 +1,36 @@
 import { useState } from "react";
 import { Pressable, ScrollView, View, type ViewStyle } from "react-native";
 import Animated, { type AnimatedStyle } from "react-native-reanimated";
+import { Bell, Search } from "lucide-react-native";
+import { Avatar } from "../../src/components/Avatar";
 import { BarChart } from "../../src/components/BarChart";
+import { BlockingSpinner } from "../../src/components/BlockingSpinner";
 import { Button } from "../../src/components/Button";
 import { Card } from "../../src/components/Card";
 import { CategoryCircle } from "../../src/components/CategoryCircle";
 import { ChartAxis } from "../../src/components/ChartAxis";
 import { ChartLegend } from "../../src/components/ChartLegend";
 import { Chip } from "../../src/components/Chip";
+import { DarkScreenScaffold } from "../../src/components/DarkScreenScaffold";
 import { Divider } from "../../src/components/Divider";
 import { Donut } from "../../src/components/Donut";
+import { EmptyState } from "../../src/components/EmptyState";
+import { ErrorState } from "../../src/components/ErrorState";
+import { FormScaffold } from "../../src/components/FormScaffold";
 import { IconButton } from "../../src/components/IconButton";
 import { Input } from "../../src/components/Input";
 import { LineChart } from "../../src/components/LineChart";
+import { LoadingState } from "../../src/components/LoadingState";
 import { PairedTitle } from "../../src/components/PairedTitle";
 import { PillBadge } from "../../src/components/PillBadge";
+import { PillNav, type PillRoute } from "../../src/components/PillNav";
 import { ProgressBar } from "../../src/components/ProgressBar";
+import { ScreenScaffold } from "../../src/components/ScreenScaffold";
 import { SectionHeader } from "../../src/components/SectionHeader";
 import { Skeleton } from "../../src/components/Skeleton";
 import { Starburst } from "../../src/components/Starburst";
 import { Text } from "../../src/components/Text";
+import { TransactionRow } from "../../src/components/TransactionRow";
 import { useCardEntrance } from "../../src/lib/motion/useCardEntrance";
 import { useConfirmPulse } from "../../src/lib/motion/useConfirmPulse";
 import { usePressScale } from "../../src/lib/motion/usePressScale";
@@ -122,6 +133,7 @@ export default function PrimitivesGallery() {
   const [chipOn, setChipOn] = useState(false);
   const [name, setName] = useState("Ada");
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [pillRoute, setPillRoute] = useState<PillRoute>("home");
 
   if (!DEV_ROUTES_ENABLED) {
     return (
@@ -356,6 +368,175 @@ export default function PrimitivesGallery() {
           </Text>
         </Pressable>
         <MotionDemos reduceMotion={reduceMotion} />
+        </View>
+        <Divider />
+
+        <View testID="gallery-section-wave6">
+        <SectionHeader title="Wave 6 — Transaction rows" />
+        <TransactionRow
+          merchant="Bolt"
+          date="Sept 14"
+          amount={420000}
+          currency="NGN"
+          category="Transport"
+          direction="expense"
+          testID="gallery-row-expense"
+        />
+        <TransactionRow
+          merchant="Salary"
+          date="Sept 1"
+          amount={25000000}
+          currency="NGN"
+          category="Income"
+          direction="income"
+          testID="gallery-row-income"
+        />
+        <TransactionRow
+          merchant="Jumia refund"
+          date="Sept 10"
+          amount={1550000}
+          currency="NGN"
+          category="Shopping"
+          direction="refund"
+          testID="gallery-row-refund"
+        />
+        <TransactionRow
+          merchant="GTB to Kuda"
+          date="Sept 12"
+          amount={5000000}
+          currency="NGN"
+          category="Internal Transfer"
+          direction="internal_transfer"
+          testID="gallery-row-transfer"
+        />
+        <Card variant="ink">
+          <TransactionRow
+            merchant="Netflix"
+            date="Sept 5"
+            amount={650000}
+            currency="NGN"
+            category="Entertainment"
+            direction="expense"
+            surface="dark"
+            testID="gallery-row-dark"
+          />
+        </Card>
+        <Divider />
+
+        <SectionHeader title="Wave 6 — States" />
+        <View style={{ height: 220 }}>
+          <EmptyState
+            message="No transactions yet. Sync an account to get started."
+            testID="gallery-empty"
+          />
+        </View>
+        <EmptyState
+          message="Nothing here with a ghost action."
+          icon={<Search size={32} color={colors.ink} strokeWidth={1.5} />}
+          action={
+            <Button title="Browse" variant="ghost" onPress={() => {}} testID="gallery-empty-action" />
+          }
+          testID="gallery-empty-actioned"
+        />
+        <View style={{ height: 220 }}>
+          <ErrorState
+            message="Sync failed. Check your connection and retry."
+            onRetry={() => {}}
+            testID="gallery-error"
+          />
+        </View>
+        <LoadingState variant="row-list" testID="gallery-loading-rows" />
+        <LoadingState variant="card-hero" testID="gallery-loading-hero" />
+        <LoadingState variant="chart-card" testID="gallery-loading-chart" />
+        <View style={{ height: 160 }}>
+          <BlockingSpinner testID="gallery-blocking" />
+        </View>
+        <Divider />
+
+        <SectionHeader title="Wave 6 — Avatars" />
+        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
+          <View style={{ margin: spacing.xs }}>
+            <Avatar displayName="Adaeze" size={32} testID="gallery-avatar-32" />
+          </View>
+          <View style={{ margin: spacing.xs }}>
+            <Avatar displayName="Adaeze" size={40} testID="gallery-avatar-40" />
+          </View>
+          <View style={{ margin: spacing.xs }}>
+            <Avatar displayName="Chidi" size={48} testID="gallery-avatar-48" />
+          </View>
+          <View style={{ margin: spacing.xs }}>
+            <Avatar displayName="Funke" size={64} testID="gallery-avatar-64" />
+          </View>
+        </View>
+        </View>
+        <Divider />
+
+        <View testID="gallery-section-wave7">
+        <SectionHeader title="Wave 7 — Scaffolds" />
+        <ScreenScaffold
+          titleFirst="Home"
+          titleSecond="Budget"
+          onBack={() => {}}
+          actions={[
+            {
+              label: "Search",
+              icon: <Search size={24} color={colors.ink} strokeWidth={1.5} />,
+              onPress: () => {},
+            },
+            {
+              label: "Notifications",
+              icon: <Bell size={24} color={colors.ink} strokeWidth={1.5} />,
+              onPress: () => {},
+            },
+          ]}
+          scroll={false}
+          testID="gallery-scaffold"
+        >
+          <Text role="body">Scaffold content with header and actions.</Text>
+        </ScreenScaffold>
+        <DarkScreenScaffold
+          titleFirst="Review"
+          titleSecond="Transactions"
+          onBack={() => {}}
+          scroll={false}
+          testID="gallery-dark-scaffold"
+        >
+          <Text role="body" color="paper">
+            Dark scaffold content on ink.
+          </Text>
+        </DarkScreenScaffold>
+        <FormScaffold
+          titleFirst="Welcome"
+          titleSecond="Back"
+          subtitle="Sign in to continue to your budgets."
+          ctaTitle="Continue"
+          onCta={() => {}}
+          testID="gallery-form"
+        >
+          <Input
+            label="Email"
+            value={name}
+            onChangeText={setName}
+            placeholder="you@example.com"
+            testID="gallery-form-input"
+          />
+        </FormScaffold>
+        <Divider />
+
+        <SectionHeader title="Wave 7 — Pill nav (tap to toggle)" />
+        <PillNav
+          active={pillRoute}
+          onNavigate={setPillRoute}
+          testID="gallery-pill"
+        />
+        <Card variant="ink">
+          <PillNav
+            active={pillRoute}
+            onNavigate={setPillRoute}
+            surface="dark"
+            testID="gallery-pill-dark"
+          />
+        </Card>
         </View>
       </View>
     </ScrollView>
