@@ -239,6 +239,69 @@
   `supabase/` untouched; SKILL_FRONTEND_DESIGN.md remains unwritten
   (earned at Phase 10).
 
+## Phase 6 checkpoint (wave 6–7, rows, states, shells, navigation)
+- Commits: `6f890f4 feat: add wave 6-7 rows, states, shells, and
+  navigation (Phase 6)` (10 components, layout token, gallery, 23 tests)
+  and `5cbc3bb fix: two-row scaffold headers, form scroll opt-out, pill
+  web shadow (Phase 6 visual pass)` (agent-as-user defects + evidence).
+- Wave 6: `src/components/TransactionRow.tsx` (CategoryCircle + Text
+  composition; sign prefix −/+/+/none; internal_transfer muted 0.6 with a
+  neutral `line`-gray circle; mono tabular amount; composed a11y label),
+  `EmptyState.tsx` (outline icon 32 at 40%, body sentence, optional action,
+  default Inbox icon), `ErrorState.tsx` (body sentence, secondary retry,
+  errorCode log-only via console.warn, never rendered), `LoadingState.tsx`
+  (`row-list`/`card-hero`/`chart-card` Skeleton compositions, no spinner),
+  `BlockingSpinner.tsx` (blocking ops only; static label under reduced
+  motion), `Avatar.tsx` (32/40/48/64, initial + deterministic hash tint
+  over coral/mint/mist/lavender, optional photoSource).
+- Wave 7: `src/components/ScreenScaffold.tsx` (SafeArea top+bottom, paper,
+  two-row header — button row then full-width paired title — scroll opt-out,
+  48px pill-nav bottom padding), `DarkScreenScaffold.tsx` (ink/paper,
+  Home+Review only), `FormScaffold.tsx` (paper, centered column capped by
+  new `src/theme/layout.ts` formMaxWidth 480, title/subtitle/inputs, fixed
+  bottom CTA, KeyboardAvoidingView, scroll opt-out), `PillNav.tsx` (16px
+  inset, paper/ink pill, House/Activity/Wallet/Lightbulb 24px, yellow
+  active circle, 70% idle, 44×44 targets, selection haptic, web boxShadow /
+  native shadow via Platform.select).
+- Additive-only existing change: `PairedTitle` gained an optional
+  `color` (default ink) so dark shells reuse it; no visual change elsewhere.
+  Barrel `src/components/index.ts` exports all ten (+ types).
+- Gallery: `app/dev/primitives.tsx` Wave 6–7 sections (5 row variants,
+  all states/loading variants, 4 avatar sizes, light+dark+form scaffolds,
+  interactive PillNav light+dark). Tokens only. Gating unchanged; prod flag
+  `EXPO_PUBLIC_ENABLE_DEV_ROUTES` is UNSET (verified "Not available" authed
+  on prod) — per spec it was left unset, so the visual pass ran locally.
+- Checks: `tsc` 0, `eslint` 0, `jest` 101 passed / 2 live-skipped (15
+  suites), `check:tokens` 0 violations, `expo export -p web` 19 routes,
+  `dist` bundle has exactly one Supabase-URL match and zero secret hits.
+- Gallery pass (self-provisioned Playwright 1.63.0 + headless Chromium,
+  authed via a confirmed throwaway user): 375×812 + 1280×800 screenshots
+  `docs/browser-tools/phase6-{gallery,section-wave6,section-wave7,rows,
+  avatars,pillnav,scaffold,dark-scaffold,form,gallery-reduced}-*.png` plus
+  `phase6-demo-{home,review,insights,ask}.png`. Pill switch proven by
+  computed background (yellow moves home→activity); form input/CTA visible
+  and focusable; reduced-motion static spinner verified. Console + network
+  empty on the second pass.
+- Defects found and fixed: (1) single-row scaffold header overflowed at 375
+  (paired title squeezed, mid-word break) → two-row header (buttons row +
+  full-width title, matching the Review reference); (2) FormScaffold
+  collapsed inside the gallery's outer scroller → additive `scroll` opt-out
+  (gallery uses `scroll={false}`); (3) RNW `shadow*` deprecation warning →
+  Platform.select boxShadow/web, shadow/native. Second pass clean.
+- Deploy: fix build live at `https://reconcile-two-tau.vercel.app`
+  (entry `entry-63b6c03b…`, fix string + Phase 6 markers + exactly one
+  Supabase URL in bundle); `curl -sIL /` and `/dev/primitives` → 200;
+  GitHub/Vercel status success on the phase commit.
+- Demo regression (same throwaway, local): sign in → sync (55 txns) →
+  review confirm (51→50 pending) → insights with real numbers → grounded
+  ask answer. No errors.
+- No product screen restyled (only `app/dev/` touched under `app/`);
+  no Wave 8 organisms; PillNav not wired into demo navigation;
+  `supabase/` untouched; `.env.local` never committed.
+- SKILL_FRONTEND_DESIGN.md note: the file pre-exists from blueprint commit
+  `38be36f` and is byte-unchanged since; this phase neither wrote nor
+  modified it (the earned v1/v2 rewrite stays a Phase 10 deliverable).
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
