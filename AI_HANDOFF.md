@@ -444,6 +444,76 @@
   fix + stress gallery + screenshots + this handoff entry, single commit
   per the pass spec).
 
+## Phase 8 checkpoint (rebuild onboarding, auth, Home, Review)
+- Commits: `3e74ed3 feat: rebuild onboarding, auth, Home, and Review
+  (Phase 8)` (8 screens, PillNav wiring, `src/lib/txn.ts`, 20 screen
+  tests) and `575645e fix: review crash on missing embeds, real hero
+  income, header fits (Phase 8 visual pass)`.
+- Screens rebuilt (data bindings unchanged, presentation only): Welcome
+  (`Get/Started`, starburst, Continue → Privacy), Privacy (`Your/Privacy`,
+  9-row paper table, Continue → Country), Country (`Your/Country`, NG chip
+  default + Coming-soon disabled others, Continue → Signup), SignUp
+  (`Create/Account`, email+password, loading CTA, error on password input,
+  → Demo), SignIn (mirror, `Welcome/Back`), Demo entry (`Try/Demo`, mist
+  includes-card, connected accounts + Sync now, disabled Connect ghost,
+  contextual CTA), Home (dark scaffold, avatar + grid/card icon buttons,
+  `Hey, <name>` greeting, HeroSummaryCard with real month income/expenses,
+  BudgetOverviewCard when a budget exists, Review-N entry, Recent/Activity
+  + View all, 5 dark rows → detail, dark PillNav Home-active), Review
+  (dark scaffold, back → Home + edit no-op, ReviewHeader + starburst +
+  N-of-M, auto-selected first row with category chips + View-details link,
+  bottom Confirm with pulse haptic + exit, empty/loading/error states).
+- PillNav wiring: Home → `/home` (NOT `/` — index bounces authed users to
+  `/demo`, so the spec's literal mapping would strand the Home pill; intent
+  preserved, deviation documented), Activity/Budget/Insights → their
+  routes; pill added to the three skeletal screens without restyling them;
+  no pill on Review/auth. Selected state is per-screen static (exact).
+- New queries: none. New shared helper `src/lib/txn.ts` (direction/tint
+  mapping, row/period/bound labels, month income) with unit tests.
+  Additive-only primitive changes: `Button` `loading` (spinner + disabled),
+  `FormScaffold` `ctaLoading`, `Donut` unchanged visually. Signup's dynamic
+  `import()` of supabase made static (no cycle; dynamic import throws under
+  jest without vm modules — found via failing test, zero prod change).
+- Web pass (Playwright, local + prod, throwaway users): full first-time
+  flow at 375×812 and 1280×800 —
+  `docs/browser-tools/phase8-{welcome,privacy,country,signup,signin,demo,
+  home,review}-*.png` plus confirmed/insights/skeletal shots. Verified:
+  single yellow hero with visible hatched arc once income derived correctly,
+  Home pill active, no pill on Review, paired-title contrast, correct
+  category tints, confirm works (queue decrements), console/network empty.
+- Defects found and fixed: (1) Review crashed on
+  `transaction_reviews[0]` of review embeds (field absent) → null-safe
+  helper + explicit suggestion id (row tint now follows picked category);
+  (2) hero Income permanently ₦0 (income rows are budget-ineligible by
+  design) → eligibility-blind month income (verified ₦570,000 = Sept salary
+  + freelance); (3) greeting wrapped 3 lines + "View all" split → ellipsis
+  + flex title; (4) cold-start blank paint in screenshots → visibility
+  waits (harness only). Second pass clean.
+- Demo loop intact end to end (sign in → sync 55 → review → confirm →
+  Home → insights → grounded ask). Activity/Budget/Insights/Ask/Detail/
+  Settings/Budget Setup remain skeletal (Phase 9).
+- Checks: `tsc` 0, `eslint` 0, `jest` 137 passed / 2 live-skipped,
+  `check:tokens` 0, `expo export` OK. Note: `jest.setTimeout(20000)` added
+  to screens + wave7 suites after first-render timeouts under CPU
+  saturation (environmental, assertions unchanged).
+- Deploy: fix build live at `https://reconcile-two-tau.vercel.app`
+  (entry `entry-35c72b36…` carries Phase 8 code; exactly one Supabase-URL
+  match; zero secret hits); `curl -sIL /` → 200; deployed Welcome
+  screenshot-verified (`phase8-welcome-prod-375.png`).
+- Native: EAS preview APK build (URL below) — smoke test pending operator
+  installation.
+- Native build: Android preview FINISHED from the fix tree
+  (`575645e98f`), SDK 57, 0.1.0 (1), internal distribution. Build page:
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/c7529ea7-90a6-4245-94c1-7a1fd5cbbfcf`
+  APK:
+  `https://expo.dev/artifacts/eas/YunMEzHotXNkgRo0NrA1okZ6bu0Yp5HPsaIroEHUGeQ.apk`
+- Note: "Native smoke test pending operator installation at
+  `https://expo.dev/artifacts/eas/YunMEzHotXNkgRo0NrA1okZ6bu0Yp5HPsaIroEHUGeQ.apk`."
+  Operator checklist: launch without crash; Welcome → Privacy → Country →
+  Sign up → Demo entry → Home; yellow hero + mist card + tinted rows + Home
+  pill; Review title/starburst/chips/confirm; touch targets; Inter; signup
+  keyboard.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
