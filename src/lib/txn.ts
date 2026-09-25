@@ -60,13 +60,20 @@ function isTintName(label: string): label is CategoryTintName {
 
 /**
  * Review category (or semantic fallback) → tinted circle category.
- * Falls back to Shopping for unknown expense categories.
+ * Accepts an explicit suggestion id (review rows carry it outside the
+ * transaction embed, which may not include reviews at all). Falls back to
+ * Shopping for unknown expense categories.
  */
-export function categoryTintFor(txn: Transaction, categories: Category[]): CategoryTintName {
+export function categoryTintFor(
+  txn: Transaction,
+  categories: Category[],
+  explicitCategoryId?: string | null,
+): CategoryTintName {
   if (txn.semantic_type === "internal_transfer") return "Internal Transfer";
-  const review = txn.transaction_reviews[0];
-  if (review?.category_id) {
-    const label = categories.find((c) => c.id === review.category_id)?.label;
+  const embedded = txn.transaction_reviews?.[0]?.category_id;
+  const categoryId = explicitCategoryId ?? embedded ?? null;
+  if (categoryId) {
+    const label = categories.find((c) => c.id === categoryId)?.label;
     if (label && isTintName(label)) return label;
   }
   if (txn.semantic_type === "income") return "Income";
@@ -78,6 +85,25 @@ export function formatRowDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso.slice(0, 10);
   return `${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * Month income by semantic type and window. Unlike spend, income ignores the
+ * budget-eligibility flag — income rows are marked ineligible because
+ * eligibility governs spend, not inflow.
+ */
+export function periodIncome(
+  txns: Transaction[],
+  startMs: number,
+  endMs: number,
+): number {
+  let income = 0;
+  for (const t of txns) {
+    const at = Date.parse(t.occurred_at);
+    if (at < startMs || at >= endMs) continue;
+    if (t.semantic_type === "income") income += t.amount_minor;
+  }
+  return income;
 }
 
 /** Current month label for hero cards, e.g. "September 2026". */

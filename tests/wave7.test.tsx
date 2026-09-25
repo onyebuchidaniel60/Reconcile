@@ -11,6 +11,10 @@ import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { Text } from "../src/components/Text";
 import { colors } from "../src/theme/colors";
 
+// Scaffold renders compile many modules on first mount; allow headroom under
+// parallel load so the suite is deterministic on saturated machines.
+jest.setTimeout(20000);
+
 describe("Wave 7 ScreenScaffold", () => {
   it("renders a header with title, back, and actions", async () => {
     const onBack = jest.fn();

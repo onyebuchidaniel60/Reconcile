@@ -20,6 +20,7 @@ import {
   formatBoundLabel,
   formatPeriodLabel,
   formatRowDate,
+  periodIncome,
 } from "../src/lib/txn";
 import { Avatar } from "../src/components/Avatar";
 import { BudgetOverviewCard } from "../src/components/organisms/BudgetOverviewCard";
@@ -41,22 +42,6 @@ function monthBounds(now: Date): { startMs: number; endMs: number } {
   const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
   return { startMs: start, endMs: end };
-}
-
-/** Month income: same window/eligibility semantics as periodSpend. */
-function periodIncome(
-  txns: Transaction[],
-  startMs: number,
-  endMs: number,
-): number {
-  let income = 0;
-  for (const t of txns) {
-    if (!t.budget_eligible) continue;
-    const at = Date.parse(t.occurred_at);
-    if (at < startMs || at >= endMs) continue;
-    if (t.semantic_type === "income") income += t.amount_minor;
-  }
-  return income;
 }
 
 function firstNameOf(email: string | undefined): string {
@@ -249,6 +234,7 @@ export default function HomeScreen() {
                 role="titleHeavy"
                 color="paper"
                 style={{ fontWeight: "600", marginTop: spacing.md }}
+                numberOfLines={1}
                 testID="home-greeting"
               >
                 Hey, {name}
@@ -295,12 +281,14 @@ export default function HomeScreen() {
                   marginBottom: spacing.sm,
                 }}
               >
-                <PairedTitle
-                  first="Recent"
-                  second="Activity"
-                  color="paper"
-                  testID="home-recent-title"
-                />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <PairedTitle
+                    first="Recent"
+                    second="Activity"
+                    color="paper"
+                    testID="home-recent-title"
+                  />
+                </View>
                 <Link href="/activity" testID="home-view-all">
                   <Text role="small" color="paper" style={{ opacity: 0.7 }}>
                     View all

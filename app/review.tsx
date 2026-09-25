@@ -177,7 +177,11 @@ export default function ReviewScreen() {
                   date={formatRowDate(t.occurred_at)}
                   amount={t.amount_minor}
                   currency={t.currency}
-                  category={categoryTintFor(t, categories)}
+                  category={categoryTintFor(
+                    t,
+                    categories,
+                    picked[item.transaction_id] ?? item.category_id,
+                  )}
                   direction={directionFor(t)}
                   surface="dark"
                   onPress={() => setSelectedId(item.transaction_id)}

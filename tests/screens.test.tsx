@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import type { ReactNode } from "react";
 import * as motion from "../src/theme/motion";
-import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate } from "../src/lib/txn";
+import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, periodIncome } from "../src/lib/txn";
 import {
   confirmReview,
   connectDemo,
@@ -15,6 +15,7 @@ import {
   getTransactions,
   syncConnection,
 } from "../src/lib/db";
+
 import WelcomeScreen from "../app/welcome";
 import PrivacyScreen from "../app/privacy";
 import CountryScreen from "../app/country";
@@ -23,6 +24,10 @@ import SignInScreen from "../app/signin";
 import DemoScreen from "../app/demo";
 import HomeScreen from "../app/home";
 import ReviewScreen from "../app/review";
+
+// Screen renders compile many modules on first mount; allow headroom under
+// parallel load so the suite is deterministic on saturated machines.
+jest.setTimeout(20000);
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
@@ -348,11 +353,27 @@ describe("txn display helpers", () => {
     ).toBe("Internal Transfer");
     expect(categoryTintFor(txn({ semantic_type: "income" }), [])).toBe("Income");
     expect(categoryTintFor(txn({ semantic_type: "expense" }), [])).toBe("Shopping");
+    // Review embeds may omit transaction_reviews entirely; the explicit id wins.
+    const bare = txn();
+    delete (bare as { transaction_reviews?: unknown }).transaction_reviews;
+    expect(categoryTintFor(bare, CATEGORIES)).toBe("Shopping");
+    expect(categoryTintFor(bare, CATEGORIES, "food")).toBe("Food");
   });
 
   it("formats row, period, and bound labels", () => {
     expect(formatRowDate("2026-09-14T10:00:00.000Z")).toBe("Sept 14");
     expect(formatPeriodLabel(new Date(2026, 8, 1))).toBe("September 2026");
     expect(formatBoundLabel(new Date(2026, 8, 1))).toBe("Sept 1, 2026");
+  });
+
+  it("sums in-month income regardless of eligibility", () => {
+    const start = new Date(2026, 8, 1).getTime();
+    const end = new Date(2026, 9, 1).getTime();
+    const rows = [
+      txn({ id: "i1", semantic_type: "income", amount_minor: 45000000, occurred_at: "2026-09-10T09:00:00.000Z", budget_eligible: false }),
+      txn({ id: "i2", semantic_type: "income", amount_minor: 12000000, occurred_at: "2026-08-11T09:00:00.000Z", budget_eligible: false }),
+      txn({ id: "e1", semantic_type: "expense", amount_minor: 420000, occurred_at: "2026-09-14T10:00:00.000Z" }),
+    ];
+    expect(periodIncome(rows, start, end)).toBe(45000000);
   });
 });
