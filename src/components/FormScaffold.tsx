@@ -14,6 +14,7 @@ interface FormScaffoldProps {
   ctaTitle: string;
   onCta?: () => void;
   ctaDisabled?: boolean;
+  ctaLoading?: boolean;
   ctaAccessibilityLabel?: string;
   /** Scrollable content area by default; opt out when embedded in a scroller. */
   scroll?: boolean;
@@ -35,6 +36,7 @@ export function FormScaffold({
   ctaTitle,
   onCta,
   ctaDisabled = false,
+  ctaLoading = false,
   ctaAccessibilityLabel,
   scroll = true,
   children,
@@ -95,6 +97,7 @@ export function FormScaffold({
             title={ctaTitle}
             onPress={onCta}
             disabled={ctaDisabled}
+            loading={ctaLoading}
             accessibilityLabel={ctaAccessibilityLabel}
             testID={testID ? `${testID}-cta` : "form-scaffold-cta"}
           />

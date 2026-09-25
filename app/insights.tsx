@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import {
@@ -14,6 +14,14 @@ import {
   type Category,
   type Transaction,
 } from "../src/lib/db";
+import { PillNav } from "../src/components/PillNav";
+
+const PILL_ROUTES = {
+  home: "/home",
+  activity: "/activity",
+  budget: "/budget",
+  insights: "/insights",
+} as const;
 
 function monthBounds(back: number): { start: number; end: number } {
   const now = new Date();
@@ -26,6 +34,7 @@ function monthBounds(back: number): { start: number; end: number } {
 }
 
 export default function InsightsScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [txns, setTxns] = useState<Transaction[]>([]);
@@ -156,6 +165,11 @@ export default function InsightsScreen() {
       )}
       <Link href="/ask">Ask Reconcile</Link>
       <Link href="/home">Back home</Link>
+      <PillNav
+        active="insights"
+        onNavigate={(route) => router.push(PILL_ROUTES[route])}
+        testID="insights-pill"
+      />
     </View>
   );
 }

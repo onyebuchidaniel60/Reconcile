@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import {
@@ -17,8 +17,17 @@ import {
   type Category,
   type Transaction,
 } from "../src/lib/db";
+import { PillNav } from "../src/components/PillNav";
+
+const PILL_ROUTES = {
+  home: "/home",
+  activity: "/activity",
+  budget: "/budget",
+  insights: "/insights",
+} as const;
 
 export default function BudgetScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [limit, setLimit] = useState<number | null>(null);
@@ -160,6 +169,11 @@ export default function BudgetScreen() {
       ))}
       <Link href="/budget-setup">Edit budget</Link>
       <Link href="/home">Back home</Link>
+      <PillNav
+        active="budget"
+        onNavigate={(route) => router.push(PILL_ROUTES[route])}
+        testID="budget-pill"
+      />
     </View>
   );
 }

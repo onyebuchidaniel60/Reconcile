@@ -1,6 +1,10 @@
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
+import { Button } from "../src/components/Button";
+import { Card } from "../src/components/Card";
+import { FormScaffold } from "../src/components/FormScaffold";
+import { Text } from "../src/components/Text";
 import {
   connectDemo,
   getAccounts,
@@ -8,6 +12,7 @@ import {
   syncConnection,
   type BankAccount,
 } from "../src/lib/db";
+import { spacing } from "../src/theme/spacing";
 
 export default function DemoScreen() {
   const router = useRouter();
@@ -65,9 +70,7 @@ export default function DemoScreen() {
     try {
       const { connection } = await connectDemo();
       const result = await syncConnection(connection.id, "initial");
-      setSyncInfo(
-        `Synced ${result.seen} transactions, added ${result.added}.`,
-      );
+      setSyncInfo(`Synced ${result.seen} transactions, added ${result.added}.`);
       router.replace("/home");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Demo setup failed.");
@@ -94,53 +97,90 @@ export default function DemoScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
+  const connected = connectionId !== null;
 
   return (
-    <View>
-      <Text>Demo Mode</Text>
-      <Text>
-        Demo data is synthetic: GTBank, UBA, and Sterling accounts with
-        generated transactions. No real bank is connected.
-      </Text>
-      {error ? <Text>{error}</Text> : null}
-      {syncInfo ? <Text>{syncInfo}</Text> : null}
-      {connectionId === null ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Enter demo mode"
-          onPress={enter}
-          disabled={busy}
-        >
-          <Text>{busy ? "Setting up..." : "Enter Demo Mode"}</Text>
-        </Pressable>
-      ) : (
-        <View>
-          <Text>Demo accounts:</Text>
-          {accounts.length === 0 ? <Text>No accounts yet.</Text> : null}
+    <FormScaffold
+      titleFirst="Try"
+      titleSecond="Demo."
+      subtitle={
+        connected
+          ? "Demo data is synthetic. No real bank is connected."
+          : "See Reconcile with sample Nigerian bank data. No real accounts connected."
+      }
+      ctaTitle={connected ? "Continue to Home" : "Enter Demo Mode"}
+      onCta={connected ? () => router.push("/home") : enter}
+      ctaDisabled={busy || loading}
+      ctaLoading={busy}
+      testID="demo"
+    >
+      <Card variant="mist" testID="demo-includes">
+        <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+          Demo includes
+        </Text>
+        <Text role="body" color="ink" style={{ marginTop: spacing.sm }}>
+          GTBank, UBA, and Sterling accounts with around 55 sample transactions.
+        </Text>
+      </Card>
+      {connected ? (
+        <View style={{ marginTop: spacing.md }}>
+          <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+            Demo accounts:
+          </Text>
+          {accounts.length === 0 ? (
+            <Text role="body" color="ink">
+              No accounts yet.
+            </Text>
+          ) : null}
           {accounts.map((a) => (
-            <Text key={a.id}>
+            <Text key={a.id} role="body" color="ink">
               {a.display_name} {a.masked_account_number}
             </Text>
           ))}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Sync now"
-            onPress={syncNow}
-            disabled={busy}
-          >
-            <Text>{busy ? "Syncing..." : "Sync now"}</Text>
-          </Pressable>
-          <Link href="/home">Continue to Home</Link>
+          {syncInfo ? (
+            <Text role="body" color="ink" style={{ marginTop: spacing.sm }}>
+              {syncInfo}
+            </Text>
+          ) : null}
+          {error ? (
+            <Text role="body" color="ink" style={{ marginTop: spacing.sm }}>
+              {error}
+            </Text>
+          ) : null}
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              title={busy ? "Syncing..." : "Sync now"}
+              variant="secondary"
+              onPress={syncNow}
+              disabled={busy}
+              loading={busy}
+              testID="demo-sync"
+            />
+          </View>
         </View>
-      )}
-      <Link href="/welcome">Back</Link>
-    </View>
+      ) : null}
+      {!connected && error ? (
+        <Text role="body" color="ink" style={{ marginTop: spacing.md }}>
+          {error}
+        </Text>
+      ) : null}
+      {loading ? (
+        <Text role="body" color="ink" style={{ marginTop: spacing.md }}>
+          Loading demo state...
+        </Text>
+      ) : null}
+      <View style={{ marginTop: spacing.md }}>
+        <Button
+          title="Connect a real bank"
+          variant="ghost"
+          disabled
+          accessibilityLabel="Connect a real bank, coming soon"
+          testID="demo-connect"
+        />
+        <Text role="small" color="ink" style={{ opacity: 0.6, textAlign: "center" }}>
+          Coming soon
+        </Text>
+      </View>
+    </FormScaffold>
   );
 }

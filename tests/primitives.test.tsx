@@ -79,6 +79,16 @@ describe("Wave 2 primitives", () => {
     expect(screen.getByRole("button", { name: "Start demo" })).toBeTruthy();
   });
 
+  it("Button loading shows a spinner and blocks presses", async () => {
+    const onPress = jest.fn();
+    await render(<Button title="Go" onPress={onPress} loading testID="btn-loading" />);
+    expect(screen.getByTestId("btn-loading-spinner")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Go" }).props.accessibilityState.busy,
+    ).toBe(true);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
   it("IconButton requires a label and fires onPress", async () => {
     const onPress = jest.fn();
     await render(

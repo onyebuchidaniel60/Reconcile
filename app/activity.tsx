@@ -1,12 +1,21 @@
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { formatMinor } from "../supabase/functions/_shared/finance";
+import { PillNav } from "../src/components/PillNav";
 import { getTransactions, type Transaction } from "../src/lib/db";
 
 type Filter = "all" | "in" | "out";
 
+const PILL_ROUTES = {
+  home: "/home",
+  activity: "/activity",
+  budget: "/budget",
+  insights: "/insights",
+} as const;
+
 export default function ActivityScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [txns, setTxns] = useState<Transaction[]>([]);
@@ -83,6 +92,11 @@ export default function ActivityScreen() {
         />
       )}
       <Link href="/home">Back home</Link>
+      <PillNav
+        active="activity"
+        onNavigate={(route) => router.push(PILL_ROUTES[route])}
+        testID="activity-pill"
+      />
     </View>
   );
 }

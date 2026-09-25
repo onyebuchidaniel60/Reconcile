@@ -1,7 +1,11 @@
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { View } from "react-native";
+import { FormScaffold } from "../src/components/FormScaffold";
+import { Input } from "../src/components/Input";
+import { Text } from "../src/components/Text";
 import { useSession } from "../src/lib/session";
+import { spacing } from "../src/theme/spacing";
 
 export default function SignInScreen() {
   const { signIn } = useSession();
@@ -33,34 +37,39 @@ export default function SignInScreen() {
   };
 
   return (
-    <View>
-      <Text>Sign in</Text>
-      <Text>Email</Text>
-      <TextInput
+    <FormScaffold
+      titleFirst="Welcome"
+      titleSecond="Back."
+      ctaTitle="Sign in"
+      onCta={submit}
+      ctaDisabled={busy}
+      ctaLoading={busy}
+      testID="signin"
+    >
+      <Input
+        label="Email"
         value={email}
         onChangeText={setEmail}
-        autoCapitalize="none"
         keyboardType="email-address"
-        accessibilityLabel="Email"
+        placeholder="you@example.com"
+        testID="signin-email"
       />
-      <Text>Password</Text>
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        accessibilityLabel="Password"
-      />
-      {error ? <Text>{error}</Text> : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Sign in"
-        onPress={submit}
-        disabled={busy}
-      >
-        <Text>{busy ? "Signing in..." : "Sign in"}</Text>
-      </Pressable>
-      <Link href="/signup">Create an account</Link>
-      <Link href="/welcome">Back</Link>
-    </View>
+      <View style={{ marginTop: spacing.md }}>
+        <Input
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholder="Your password"
+          error={error}
+          testID="signin-password"
+        />
+      </View>
+      <Link href="/signup" testID="signin-signup">
+        <Text role="small" color="ink" style={{ marginTop: spacing.md }}>
+          No account yet? Create one.
+        </Text>
+      </Link>
+    </FormScaffold>
   );
 }

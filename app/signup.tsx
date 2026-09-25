@@ -1,7 +1,12 @@
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { View } from "react-native";
+import { FormScaffold } from "../src/components/FormScaffold";
+import { Input } from "../src/components/Input";
+import { Text } from "../src/components/Text";
 import { useSession } from "../src/lib/session";
+import { getSupabase } from "../src/lib/supabase";
+import { spacing } from "../src/theme/spacing";
 
 export default function SignUpScreen() {
   const { signUp } = useSession();
@@ -25,8 +30,6 @@ export default function SignUpScreen() {
       if (message) {
         setError(message);
       } else {
-        // With email confirmation on, there is no session yet.
-        const { getSupabase } = await import("../src/lib/supabase");
         const { data } = await getSupabase().auth.getSession();
         if (data.session) {
           router.replace("/demo");
@@ -42,37 +45,44 @@ export default function SignUpScreen() {
   };
 
   return (
-    <View>
-      <Text>Sign up</Text>
-      <Text>Email</Text>
-      <TextInput
+    <FormScaffold
+      titleFirst="Create"
+      titleSecond="Account."
+      ctaTitle="Create account"
+      onCta={submit}
+      ctaDisabled={busy}
+      ctaLoading={busy}
+      testID="signup"
+    >
+      <Input
+        label="Email"
         value={email}
         onChangeText={setEmail}
-        autoCapitalize="none"
         keyboardType="email-address"
-        accessibilityLabel="Email"
+        placeholder="you@example.com"
+        testID="signup-email"
       />
-      <Text>Password</Text>
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        accessibilityLabel="Password"
-      />
-      {error ? <Text>{error}</Text> : null}
+      <View style={{ marginTop: spacing.md }}>
+        <Input
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholder="Choose a password"
+          error={error}
+          testID="signup-password"
+        />
+      </View>
       {needsConfirmation ? (
-        <Text>Check your inbox to confirm your email, then sign in.</Text>
+        <Text role="body" color="ink" style={{ marginTop: spacing.md }}>
+          Check your inbox to confirm your email, then sign in.
+        </Text>
       ) : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Create account"
-        onPress={submit}
-        disabled={busy}
-      >
-        <Text>{busy ? "Creating..." : "Create account"}</Text>
-      </Pressable>
-      <Link href="/signin">I already have an account</Link>
-      <Link href="/welcome">Back</Link>
-    </View>
+      <Link href="/signin" testID="signup-signin">
+        <Text role="small" color="ink" style={{ marginTop: spacing.md }}>
+          Already have an account? Sign in.
+        </Text>
+      </Link>
+    </FormScaffold>
   );
 }
