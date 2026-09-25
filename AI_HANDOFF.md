@@ -302,6 +302,72 @@
   `38be36f` and is byte-unchanged since; this phase neither wrote nor
   modified it (the earned v1/v2 rewrite stays a Phase 10 deliverable).
 
+## Phase 7 checkpoint (wave 8 feature organisms)
+- Commits: `b5a7ff2 feat: add wave 8 feature organisms (Phase 7)`
+  (7 organisms, barrel, gallery, 13 tests) and `c231308 fix: single hero
+  legend, amount step-downs, insight pair fit (Phase 7 visual pass)`
+  (agent-as-user defects + evidence).
+- Organisms (`src/components/organisms/`, all pure compositions, no new
+  primitives): `HeroSummaryCard.tsx` (yellow Card, Summary + pressable
+  period selector with chevron, Donut with legend hidden, own ChartLegend
+  with paper/ink dots legible on yellow), `BudgetOverviewCard.tsx` (mist
+  compact, Today pill, ink ProgressBar with percent label, muted date ends;
+  spent/limit feed the a11y description), `ExpensesBarCard.tsx` (yellow,
+  pressable range header, BarChart 4 bars via its own callout slot for the
+  alert-red starburst; one-hatched rule still enforced by
+  `validateBarFills`), `SpendTrendCard.tsx` (ink, centered paper hero
+  amount, muted spent-out-of line, paper corner starburst, LineChart with
+  optional dashed projection), `PositiveMessageCard.tsx` (mint compact,
+  16px padding via token style override so Card's 20/24 contract is
+  untouched, single body-500 sentence), `InsightCard.tsx` (paper compact,
+  muted label, paired h3 amounts with ink arrow+sign delta — never color —
+  plus explanation), `ReviewHeader.tsx` (transparent, paper PairedTitle via
+  the Phase 6 color prop, optional yellow starburst, right-pinned progress).
+  Barrel `organisms/index.ts`, re-exported from `src/components/index.ts`.
+- Additive Donut refinement (backward compatible, existing tests green):
+  `showLegend` opt-out plus an h2→h3 center step-down for totals longer
+  than 10 chars so realistic NGN amounts stay inside the hole.
+  SpendTrendCard hero steps display→h1 past 10 chars for the same reason.
+- Gallery: "Wave 8 — Organisms" section (demo-labeled fixtures: hero
+  ₦1,747,000/₦1,070,000 for September 2026; budget ₦171,650/₦250,000;
+  May–Aug bars with hatched Jun + "+₦26,000" callout; trend 4 points +
+  projection; positive line; insight down 56%; Review header in ink) plus a
+  "Home composition preview" (DarkScreenScaffold + hero + budget + 3 dark
+  rows + dark PillNav, Home active, preview-labeled). Nothing wired into
+  product screens; demo tab navigation untouched.
+- Checks: `tsc` 0, `eslint` 0, `jest` 116 passed / 2 live-skipped (16
+  suites), `check:tokens` 0 violations, `expo export -p web` OK.
+- Gallery pass (Playwright 1.63.0, local server, confirmed throwaway user):
+  Wave 8 + home preview at 375×812 and 1280×800 —
+  `docs/browser-tools/phase7-{organisms,home-preview}-*.png` plus element
+  shots `phase7-{hero,expenses,trend}-375.png` and fix checks
+  `phase7-check-*-375.png`. Period/range callbacks fire without errors;
+  console + network empty on both viewports.
+- Verified per design.md §8: visible hatched donut arc with readable center;
+  exactly one hatched bar with alert-red callout; dashed projection;
+  paper starburst on ink; yellow hero is the single accent in the preview;
+  paired-title weight contrast visible.
+- Defects found and fixed: (1) Donut's internal legend duplicated the
+  card legend (and its yellow dot vanished on yellow) → `showLegend`
+  opt-out + paper/ink card legend; (2) long NGN totals overlapped donut
+  arcs / clipped at card edge → center + hero step-downs; (3) insight pair
+  ellipsized at h2 → h3 pair with tighter delta margins, both amounts now
+  full on one line. Second pass clean.
+- Deploy: fix build live at `https://reconcile-two-tau.vercel.app`
+  (entry `entry-2f1d1b3b…` contains `showLegend` + organism strings;
+  exactly one Supabase-URL match; zero secret hits);
+  `curl -sIL /` and `/dev/primitives` → 200. Flag
+  `EXPO_PUBLIC_ENABLE_DEV_ROUTES` remains unset in Vercel — not set.
+- Demo regression (same user, local): sync (55 txns, added 0) → review
+  confirm works (47 pending after confirm; one pass read 49→49 on a stale
+  render and was re-proven 48→47 with zero errors) → insights real numbers
+  → grounded ask answer. No product code touched by this phase.
+- No product screen restyled (only `app/dev/` + `src/components/`
+  incl. new `organisms/`); PillNav still not wired into demo routing;
+  `supabase/` untouched; `.env.local` never committed.
+- SKILL_FRONTEND_DESIGN.md untouched (still byte-identical since `38be36f`;
+  the earned rewrite stays a Phase 10 deliverable).
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
