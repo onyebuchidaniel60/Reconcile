@@ -1,0 +1,12 @@
+# EAS upload ignore. Mirrors .gitignore secret handling: local env files and
+# keystores must never be uploaded to EAS. .env.production holds only public
+# EXPO_PUBLIC_* values and IS uploaded (the build needs them inlined).
+.env
+.env.local
+.env*.local
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision

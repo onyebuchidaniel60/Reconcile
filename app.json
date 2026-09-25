@@ -13,9 +13,13 @@
       "backgroundColor": "#F6F6F1"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.onyebuchidaniel.reconcile",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.onyebuchidaniel.reconcile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#F6F6F1",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -36,6 +40,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "10e4b9e0-32d7-41cb-b938-ef81177f588d"
+      }
+    },
+    "owner": "buchi208"
   }
 }
