@@ -1,12 +1,13 @@
 import { Link, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import {
   createBudget,
   getCategories,
   parseMajorToMinor,
   type Category,
 } from "../src/lib/db";
+import { spacing } from "../src/theme/spacing";
 
 export default function BudgetSetupScreen() {
   const router = useRouter();
@@ -69,8 +70,16 @@ export default function BudgetSetupScreen() {
     );
   }
 
+  // Skeletal demo screen (rebuilt in Phase 9). The scrollable padded
+  // container keeps the long category list reachable and inputs off the
+  // screen edges at narrow native widths.
   return (
-    <View>
+    <ScrollView
+      contentContainerStyle={{
+        paddingHorizontal: spacing.xl,
+        paddingBottom: spacing.xl,
+      }}
+    >
       <Text>Budget setup (Demo)</Text>
       {error ? <Text>{error}</Text> : null}
       <Text>Monthly total (₦)</Text>
@@ -101,6 +110,6 @@ export default function BudgetSetupScreen() {
         <Text>{busy ? "Saving..." : "Save budget"}</Text>
       </Pressable>
       <Link href="/budget">Back to budget</Link>
-    </View>
+    </ScrollView>
   );
 }

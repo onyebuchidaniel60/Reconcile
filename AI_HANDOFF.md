@@ -403,6 +403,47 @@
   report findings. No agent-side device was available.
 - Web deploy from the same tree is unaffected (Vercel auto-deploys main).
 
+## Phase 7 native smoke-test verification (between Phase 7 and 8, not a phase)
+- Operator device findings (Android APK from `0211c39`): launches cleanly,
+  no crashes, keyboard fine, safe areas mostly fine, fonts look like Inter
+  (unverified), touch targets unevaluable on skeletal UI, one defect: Budget
+  Setup numbers/category values overflow horizontally.
+- Part A (fonts — verified by inspection, no fix): entry `app/_layout.tsx`
+  loads all six weights via `useFonts` (`Inter_300Light/400Regular/
+  500Medium/600SemiBold/700Bold/800ExtraBold`); every role in
+  `src/theme/type.ts` resolves through `fontFamilyForWeight` to a loaded
+  family (display→800, title 300/700, h1→700, h2/h3→600, body→400,
+  small/mono→500); `Text.tsx` is the only `fontFamily` setter in `src/`;
+  no bare `"Inter"` string survives; `expo-font` plugin present in
+  `app.json` (no extra config needed for `useFonts`). No fallback path.
+- Part B (360px component safety — clean, no component fixed): new gallery
+  section `gallery-section-stress` (2-input form, long label/value inputs,
+  long-text card, 7-chip wrap row, 20-digit merchant row, long-label
+  progress) plus all Wave 6–8 sections screenshotted at 360×800
+  (`docs/browser-tools/phase7-native-check-*.png`). Programmatic check:
+  page scrollWidth == 360, zero viewport escapes across 18 components, empty
+  console/network. Long merchant ellipsizes while the full amount is
+  preserved; chips wrap; form/card/progress/hero/bars/trend/insight/preview
+  all fit.
+- Part C (demo Budget Setup — minimal skeletal fix, no redesign): root
+  cause is an unpadded, unscrolled container (edge-clipped inputs,
+  13-category list unreachable); fix wraps content in a `ScrollView` with
+  `spacing.xl` horizontal padding (theme token, check-clean). Verified at
+  360px with 20-digit values: padded, scrollable, no overflow. Phase 9
+  still replaces the screen.
+- Test note: one transient single-test failure under parallel load in two
+  full runs (failing test name not captured); the same suite passes 8+
+  consecutive full runs including six straight 116/116 runs. Unconfirmed
+  hypothesis: first-render timeout under CPU contention (Phase 6 precedent).
+  No code change in this pass touches tested logic.
+- Remaining native concerns for Phase 8: touch targets still unevaluable
+  until rebuilt screens land; fonts confirmed by inspection only (no
+  device-side font dump); operator re-verification of Budget Setup on the
+  next APK.
+- Commit: `fix: address native smoke test findings (Phase 7)` (budget-setup
+  fix + stress gallery + screenshots + this handoff entry, single commit
+  per the pass spec).
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 

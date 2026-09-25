@@ -693,6 +693,62 @@ export default function PrimitivesGallery() {
           />
         </DarkScreenScaffold>
         </View>
+        <Divider />
+
+        <View testID="gallery-section-stress">
+        <SectionHeader title="Narrow-width stress (demo)" />
+        <Text role="small">Overflow probes for 360px native widths — demo only.</Text>
+        <FormScaffold
+          titleFirst="Monthly"
+          titleSecond="Budget"
+          subtitle="Set caps that fit a narrow screen."
+          ctaTitle="Save budget"
+          onCta={() => {}}
+          scroll={false}
+          testID="gallery-stress-form"
+        >
+          <Input
+            label="Monthly total budget cap amount in naira"
+            value="1,747,000.00"
+            onChangeText={() => {}}
+            testID="gallery-stress-input-long"
+          />
+          <Input
+            label="Food cap"
+            value="250,000.00"
+            onChangeText={() => {}}
+            testID="gallery-stress-input"
+          />
+        </FormScaffold>
+        <Card variant="paper" testID="gallery-stress-card">
+          <Text role="body">
+            A very long paragraph that should wrap inside the card without
+            pushing past the screen edge on a narrow 360 pixel wide Android
+            device viewport.
+          </Text>
+        </Card>
+        <View style={{ flexDirection: "row", flexWrap: "wrap" }} testID="gallery-stress-chips">
+          {["All", "Food", "Transport", "Bills", "Shopping", "Health", "Income"].map((label) => (
+            <View key={label} style={{ margin: spacing.xs }}>
+              <Chip label={label} />
+            </View>
+          ))}
+        </View>
+        <TransactionRow
+          merchant="A Very Long Merchant Name That Should Ellipsize Gracefully"
+          date="September 14, 2026"
+          amount={987654321098}
+          currency="NGN"
+          category="Shopping"
+          direction="expense"
+          testID="gallery-stress-row"
+        />
+        <ProgressBar
+          value={0.5}
+          label="Over budget by 125%"
+          testID="gallery-stress-progress"
+        />
+        </View>
       </View>
     </ScrollView>
   );
