@@ -21,6 +21,15 @@ import { IconButton } from "../../src/components/IconButton";
 import { Input } from "../../src/components/Input";
 import { LineChart } from "../../src/components/LineChart";
 import { LoadingState } from "../../src/components/LoadingState";
+import {
+  BudgetOverviewCard,
+  ExpensesBarCard,
+  HeroSummaryCard,
+  InsightCard,
+  PositiveMessageCard,
+  ReviewHeader,
+  SpendTrendCard,
+} from "../../src/components/organisms";
 import { PairedTitle } from "../../src/components/PairedTitle";
 import { PillBadge } from "../../src/components/PillBadge";
 import { PillNav, type PillRoute } from "../../src/components/PillNav";
@@ -134,6 +143,7 @@ export default function PrimitivesGallery() {
   const [name, setName] = useState("Ada");
   const [reduceMotion, setReduceMotion] = useState(false);
   const [pillRoute, setPillRoute] = useState<PillRoute>("home");
+  const [previewRoute, setPreviewRoute] = useState<PillRoute>("home");
 
   if (!DEV_ROUTES_ENABLED) {
     return (
@@ -538,6 +548,150 @@ export default function PrimitivesGallery() {
             testID="gallery-pill-dark"
           />
         </Card>
+        </View>
+        <Divider />
+
+        <View testID="gallery-section-wave8">
+        <SectionHeader title="Wave 8 — Organisms (demo fixtures)" />
+        <Text role="small">Demo fixtures below — not real data.</Text>
+        <HeroSummaryCard
+          period="September 2026"
+          total={281700000}
+          income={174700000}
+          expenses={107000000}
+          currency="NGN"
+          onPressPeriod={() => {}}
+          testID="gallery-hero"
+        />
+        <BudgetOverviewCard
+          spent={17165000}
+          limit={25000000}
+          currency="NGN"
+          periodStart="Sept 1, 2026"
+          periodEnd="Sept 30, 2026"
+          progress={17165000 / 25000000}
+          testID="gallery-budget-overview"
+        />
+        <ExpensesBarCard
+          bars={[
+            { label: "May", value: 9800000, fill: "ink" },
+            { label: "Jun", value: 12400000, fill: "hatched" },
+            { label: "Jul", value: 8600000, fill: "ink" },
+            { label: "Aug", value: 7900000, fill: "ink" },
+          ]}
+          axisTicks={[
+            { value: 0, label: "₦0" },
+            { value: 5000000, label: "₦50k" },
+            { value: 10000000, label: "₦100k" },
+            { value: 15000000, label: "₦150k" },
+          ]}
+          callout="+₦26,000"
+          currency="NGN"
+          onPressRange={() => {}}
+          testID="gallery-expenses"
+        />
+        <SpendTrendCard
+          spent={41250000}
+          limit={50000000}
+          currency="NGN"
+          points={[
+            { x: 1, y: 120 },
+            { x: 10, y: 200 },
+            { x: 20, y: 290 },
+            { x: 30, y: 340 },
+          ]}
+          projectedFrom={3}
+          axisTicks={[
+            { value: 1, label: "Sept 1" },
+            { value: 15, label: "Sept 15" },
+            { value: 30, label: "Sept 30" },
+          ]}
+          testID="gallery-trend"
+        />
+        <PositiveMessageCard
+          message="Keep spending. You can spend ₦4,200 each day for the rest of the period."
+          testID="gallery-positive"
+        />
+        <InsightCard
+          label="This month vs last month"
+          primary={14683647}
+          secondary={33567435}
+          delta={56}
+          deltaDirection="down"
+          explanation="Food costs fell after the holidays, pulling total spend below last month."
+          currency="NGN"
+          testID="gallery-insight"
+        />
+        <Card variant="ink">
+          <ReviewHeader
+            firstWord="Review"
+            secondWord="Transactions"
+            starburst
+            progress="3 of 12"
+            testID="gallery-review-header"
+          />
+        </Card>
+        </View>
+        <Divider />
+
+        <View testID="gallery-home-preview">
+        <SectionHeader title="Home composition preview (demo)" />
+        <Text role="small">Preview of the Phase 8 Home screen — not real data.</Text>
+        <DarkScreenScaffold scroll={false} testID="gallery-preview-scaffold">
+          <HeroSummaryCard
+            period="September 2026"
+            total={281700000}
+            income={174700000}
+            expenses={107000000}
+            currency="NGN"
+            testID="gallery-preview-hero"
+          />
+          <BudgetOverviewCard
+            spent={17165000}
+            limit={25000000}
+            currency="NGN"
+            periodStart="Sept 1, 2026"
+            periodEnd="Sept 30, 2026"
+            progress={17165000 / 25000000}
+            testID="gallery-preview-budget"
+          />
+          <TransactionRow
+            merchant="Bolt"
+            date="Sept 14"
+            amount={420000}
+            currency="NGN"
+            category="Transport"
+            direction="expense"
+            surface="dark"
+            testID="gallery-preview-row-1"
+          />
+          <TransactionRow
+            merchant="Shoprite"
+            date="Sept 13"
+            amount={850000}
+            currency="NGN"
+            category="Food"
+            direction="expense"
+            surface="dark"
+            testID="gallery-preview-row-2"
+          />
+          <TransactionRow
+            merchant="Netflix"
+            date="Sept 5"
+            amount={650000}
+            currency="NGN"
+            category="Entertainment"
+            direction="expense"
+            surface="dark"
+            testID="gallery-preview-row-3"
+          />
+          <PillNav
+            active={previewRoute}
+            onNavigate={setPreviewRoute}
+            surface="dark"
+            testID="gallery-preview-pill"
+          />
+        </DarkScreenScaffold>
         </View>
       </View>
     </ScrollView>

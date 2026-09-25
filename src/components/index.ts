@@ -1,4 +1,4 @@
-// Component barrel (Phases 4–6, Waves 1–7). Screens compose these; nothing else.
+// Component barrel (Phases 4–7, Waves 1–8). Screens compose these; nothing else.
 export { Avatar, avatarInitialForName, avatarTintForName, type AvatarSize } from "./Avatar";
 export { BarChart, validateBarFills, type BarDatum, type BarFill } from "./BarChart";
 export { BlockingSpinner } from "./BlockingSpinner";
@@ -20,6 +20,16 @@ export { IconButton } from "./IconButton";
 export { Input } from "./Input";
 export { LineChart, type LinePoint } from "./LineChart";
 export { LoadingState, type LoadingVariant } from "./LoadingState";
+export {
+  BudgetOverviewCard,
+  ExpensesBarCard,
+  HeroSummaryCard,
+  InsightCard,
+  PositiveMessageCard,
+  ReviewHeader,
+  SpendTrendCard,
+  type DeltaDirection,
+} from "./organisms";
 export { PairedTitle } from "./PairedTitle";
 export { PillBadge, type PillBadgeVariant } from "./PillBadge";
 export { PillNav, type PillRoute, type PillSurface } from "./PillNav";
