@@ -327,31 +327,37 @@ Server-only:
 
 ## 24. Phased implementation plan
 
-The plan is frontend-first per `SKILL_LEAN_DELIVERY.md` Stage 4. The authoritative
-phase list is `IMPLEMENTATION_PLAN.md` v2.
+The plan is frontend-first with dual-surface verification, per
+`SKILL_LEAN_DELIVERY.md` Stage 4. The authoritative phase list is
+`IMPLEMENTATION_PLAN.md` v3.
 
 **Completed:**
 - Phase 0 — Blueprint
 - Phase 1 — Mobile foundation
 - Phase 2 — Core demo (tagged `demo-v1`)
-
-**Full build:**
 - Phase 3 — Design tokens
 - Phase 4 — Wave 1–3 primitives
 - Phase 5 — Wave 4–5: charts, accent, motion, haptics
 - Phase 6 — Wave 6–7: rows, states, shells, navigation
-- Phase 7 — Wave 8: feature organisms
+
+**Full build:**
+- Phase 7 — Wave 8 feature organisms + native build pipeline
 - Phase 8 — Screen rebuild: onboarding, auth, Home, Review
 - Phase 9 — Screen rebuild: Activity, Detail, Budget, Insights, Ask, Settings
-- Phase 10 — Browser agent-as-user pass + `SKILL_FRONTEND_DESIGN.md` v1
+- Phase 10 — Dual-surface agent-as-user pass + `SKILL_FRONTEND_DESIGN.md` v1
 - Phase 11 — Mono integration
 - Phase 12 — RevenueCat monetization
 - Phase 13 — Real AI (OpenAI)
 - Phase 14 — Security hardening and deletion
 - Phase 15 — E2E, store packaging, Shipaton release
 
-Every phase ends with the same protocol: implement → test → inspect → deploy →
-agent-as-user pass → fix → update `AI_HANDOFF.md` → commit → STOP.
+From Phase 7 onward, every phase is verified on **both** web (Vercel +
+Playwright) and native (EAS preview build installed on a real Android device).
+Native-specific behavior — safe areas, keyboard handling, fonts, shadows, touch
+targets, haptics — cannot be verified on web alone.
+
+Every phase ends with the same protocol: implement → test → inspect → deploy
+(web + native) → verify as user → fix → update `AI_HANDOFF.md` → commit → STOP.
 
 ## 25–29. Handoff documents
 
