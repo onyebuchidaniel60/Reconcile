@@ -60,46 +60,51 @@ export function ScreenScaffold({
   const header = hasHeader ? (
     <View
       style={{
-        flexDirection: "row",
-        alignItems: "center",
         paddingHorizontal: spacing.xl,
         paddingTop: spacing.md,
         paddingBottom: spacing.md,
       }}
     >
-      {onBack ? (
-        <IconButton
-          accessibilityLabel={backLabel}
-          onPress={onBack}
-          tone={iconTone}
-          testID={testID ? `${testID}-back` : undefined}
-        >
-          {backIcon ?? <ChevronLeft size={24} color={iconColor} strokeWidth={1.5} />}
-        </IconButton>
+      {onBack || visibleActions.length > 0 ? (
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {onBack ? (
+            <IconButton
+              accessibilityLabel={backLabel}
+              onPress={onBack}
+              tone={iconTone}
+              testID={testID ? `${testID}-back` : undefined}
+            >
+              {backIcon ?? <ChevronLeft size={24} color={iconColor} strokeWidth={1.5} />}
+            </IconButton>
+          ) : null}
+          <View style={{ flex: 1 }} />
+          {visibleActions.map((action) => (
+            <View key={action.label} style={{ marginLeft: spacing.sm }}>
+              <IconButton
+                accessibilityLabel={action.label}
+                onPress={action.onPress}
+                tone={iconTone}
+                testID={action.testID}
+              >
+                {action.icon}
+              </IconButton>
+            </View>
+          ))}
+        </View>
       ) : null}
       {hasTitle ? (
-        <View style={{ flex: 1, marginLeft: onBack ? spacing.md : undefined }}>
+        <View
+          style={{
+            marginTop: onBack || visibleActions.length > 0 ? spacing.md : undefined,
+          }}
+        >
           <PairedTitle
             first={titleFirst ?? ""}
             second={titleSecond ?? ""}
             color={dark ? "paper" : "ink"}
           />
         </View>
-      ) : (
-        <View style={{ flex: 1 }} />
-      )}
-      {visibleActions.map((action) => (
-        <View key={action.label} style={{ marginLeft: spacing.sm }}>
-          <IconButton
-            accessibilityLabel={action.label}
-            onPress={action.onPress}
-            tone={iconTone}
-            testID={action.testID}
-          >
-            {action.icon}
-          </IconButton>
-        </View>
-      ))}
+      ) : null}
     </View>
   ) : null;
 

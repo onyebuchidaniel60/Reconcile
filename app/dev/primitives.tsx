@@ -511,6 +511,7 @@ export default function PrimitivesGallery() {
           subtitle="Sign in to continue to your budgets."
           ctaTitle="Continue"
           onCta={() => {}}
+          scroll={false}
           testID="gallery-form"
         >
           <Input

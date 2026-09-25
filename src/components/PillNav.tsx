@@ -1,4 +1,4 @@
-import { Pressable, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 import { Activity, House, Lightbulb, Wallet, type LucideIcon } from "lucide-react-native";
 import { select } from "../lib/haptics";
 import { colors } from "../theme/colors";
@@ -60,11 +60,18 @@ export function PillNav({ active, onNavigate, surface = "light", testID, style }
           paddingHorizontal: spacing.md,
           borderRadius: radius.pill,
           backgroundColor: dark ? colors.ink : colors.paper,
-          shadowColor: colors.ink,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.12,
-          shadowRadius: 12,
-          elevation: 3,
+          ...Platform.select({
+            // react-native-web deprecated shadow* props; boxShadow is the
+            // web equivalent of the soft native shadow below.
+            web: { boxShadow: "0 2px 12px rgba(10, 10, 10, 0.12)" },
+            default: {
+              shadowColor: colors.ink,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.12,
+              shadowRadius: 12,
+              elevation: 3,
+            },
+          }),
         },
         style,
       ]}

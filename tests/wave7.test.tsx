@@ -119,6 +119,16 @@ describe("Wave 7 FormScaffold", () => {
       screen.getByRole("button", { name: "Go" }).props.accessibilityState.disabled,
     ).toBe(true);
   });
+
+  it("renders inline content when scroll is disabled", async () => {
+    await render(
+      <FormScaffold titleFirst="A" titleSecond="B" ctaTitle="Go" scroll={false}>
+        <Text>Inline fields</Text>
+      </FormScaffold>,
+    );
+    expect(screen.getByText("Inline fields")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Go" })).toBeTruthy();
+  });
 });
 
 describe("Wave 7 PillNav", () => {

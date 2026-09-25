@@ -15,6 +15,8 @@ interface FormScaffoldProps {
   onCta?: () => void;
   ctaDisabled?: boolean;
   ctaAccessibilityLabel?: string;
+  /** Scrollable content area by default; opt out when embedded in a scroller. */
+  scroll?: boolean;
   children: React.ReactNode;
   testID?: string;
   style?: StyleProp<ViewStyle>;
@@ -34,11 +36,34 @@ export function FormScaffold({
   onCta,
   ctaDisabled = false,
   ctaAccessibilityLabel,
+  scroll = true,
   children,
   testID,
   style,
 }: FormScaffoldProps) {
   const hasTitle = titleFirst !== undefined || titleSecond !== undefined;
+  const content = (
+    <View
+      style={{
+        flex: 1,
+        width: "100%",
+        maxWidth: layout.formMaxWidth,
+        alignSelf: "center",
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing.xl,
+      }}
+    >
+      {hasTitle ? (
+        <PairedTitle first={titleFirst ?? ""} second={titleSecond ?? ""} />
+      ) : null}
+      {subtitle ? (
+        <Text role="body" color="ink" style={{ marginTop: spacing.md }}>
+          {subtitle}
+        </Text>
+      ) : null}
+      <View style={{ marginTop: spacing.xl }}>{children}</View>
+    </View>
+  );
   return (
     <SafeAreaView
       edges={["top", "bottom"]}
@@ -50,31 +75,16 @@ export function FormScaffold({
         testID={testID ? `${testID}-avoider` : "form-scaffold-avoider"}
         style={{ flex: 1 }}
       >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View
-            style={{
-              flex: 1,
-              width: "100%",
-              maxWidth: layout.formMaxWidth,
-              alignSelf: "center",
-              paddingHorizontal: spacing.xl,
-              paddingTop: spacing.xl,
-            }}
+        {scroll ? (
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
           >
-            {hasTitle ? (
-              <PairedTitle first={titleFirst ?? ""} second={titleSecond ?? ""} />
-            ) : null}
-            {subtitle ? (
-              <Text role="body" color="ink" style={{ marginTop: spacing.md }}>
-                {subtitle}
-              </Text>
-            ) : null}
-            <View style={{ marginTop: spacing.xl }}>{children}</View>
-          </View>
-        </ScrollView>
+            {content}
+          </ScrollView>
+        ) : (
+          content
+        )}
         <View
           style={{
             paddingHorizontal: spacing.xl,
