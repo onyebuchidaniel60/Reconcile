@@ -18,9 +18,11 @@ interface SpendTrendCardProps {
 }
 
 /**
- * Spend trend per design.md §8: ink card with a centered paper hero amount,
- * a muted "spent out of" line, a paper starburst in the top-right corner,
- * and a yellow line chart with an optional dashed projection segment.
+ * Spend trend per design.md §8: ink card with a centered paper hero amount
+ * (display, stepping down to h1 for long currency strings so realistic NGN
+ * totals never clip), a muted "spent out of" line, a paper starburst in the
+ * top-right corner, and a yellow line chart with an optional dashed
+ * projection segment.
  */
 export function SpendTrendCard({
   spent,
@@ -35,6 +37,7 @@ export function SpendTrendCard({
   const accessibilityLabel =
     `Spent ${formatMinor(spent, currency)} ` +
     `out of ${formatMinor(limit, currency)}.`;
+  const amountLabel = formatMinor(spent, currency);
 
   return (
     <View accessibilityLabel={accessibilityLabel} testID={testID} style={style}>
@@ -46,8 +49,12 @@ export function SpendTrendCard({
             testID={testID ? `${testID}-starburst` : "spend-trend-starburst"}
           />
         </View>
-        <Text role="display" color="paper" style={{ textAlign: "center" }}>
-          {formatMinor(spent, currency)}
+        <Text
+          role={amountLabel.length > 10 ? "h1" : "display"}
+          color="paper"
+          style={{ textAlign: "center" }}
+        >
+          {amountLabel}
         </Text>
         <Text
           role="small"

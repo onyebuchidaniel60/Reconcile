@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { describe, expect, it, jest } from "@jest/globals";
+import { StyleSheet } from "react-native";
 import { validateBarFills } from "../src/components/BarChart";
+import { Donut } from "../src/components/Donut";
 import { BudgetOverviewCard } from "../src/components/organisms/BudgetOverviewCard";
 import { ExpensesBarCard } from "../src/components/organisms/ExpensesBarCard";
 import { HeroSummaryCard } from "../src/components/organisms/HeroSummaryCard";
@@ -37,9 +39,9 @@ describe("Wave 8 HeroSummaryCard", () => {
     expect(screen.getByText("Summary")).toBeTruthy();
     expect(screen.getByText("September 2026")).toBeTruthy();
     expect(screen.getByText("₦2,817,000.00")).toBeTruthy();
-    // Twice: the Donut's internal legend and the card's own ChartLegend.
-    expect(screen.getAllByText("Income ₦1,747,000.00")).toHaveLength(2);
-    expect(screen.getAllByText("Expenses ₦1,070,000.00")).toHaveLength(2);
+    // Once: the Donut's internal legend is hidden in favor of the card legend.
+    expect(screen.getByText("Income ₦1,747,000.00")).toBeTruthy();
+    expect(screen.getByText("Expenses ₦1,070,000.00")).toBeTruthy();
     expect(
       screen.getByLabelText(
         "Summary for September 2026. Income ₦1,747,000.00, expenses ₦1,070,000.00.",
@@ -252,6 +254,50 @@ describe("Wave 8 ReviewHeader", () => {
     );
     expect(screen.queryByTestId("review-plain-starburst")).toBeNull();
     expect(screen.queryByTestId("review-plain-progress")).toBeNull();
+  });
+});
+
+describe("Wave 8 amount scaling", () => {
+  it("Donut hides its legend on request and steps long totals down", async () => {
+    const { unmount } = await render(
+      <Donut
+        total={174700}
+        primary={0.62}
+        currency="NGN"
+        labels={{ primary: "Income", secondary: "Expenses" }}
+      />,
+    );
+    expect(screen.getByText("Income ₦1,083.14")).toBeTruthy();
+    await unmount();
+    await render(
+      <Donut
+        total={281700000}
+        primary={0.62}
+        currency="NGN"
+        labels={{ primary: "Income", secondary: "Expenses" }}
+        showLegend={false}
+      />,
+    );
+    expect(screen.queryByText("Income ₦1,746,540.00")).toBeNull();
+    expect(
+      StyleSheet.flatten(screen.getByText("₦2,817,000.00").props.style).fontSize,
+    ).toBe(19);
+  });
+
+  it("SpendTrendCard steps long hero amounts down", async () => {
+    await render(
+      <SpendTrendCard
+        spent={41250000}
+        limit={50000000}
+        currency="NGN"
+        points={[{ x: 1, y: 1 }]}
+        axisTicks={[]}
+        testID="trend-step"
+      />,
+    );
+    expect(
+      StyleSheet.flatten(screen.getByText("₦412,500.00").props.style).fontSize,
+    ).toBe(30);
   });
 });
 

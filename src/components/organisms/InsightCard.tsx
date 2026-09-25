@@ -38,10 +38,10 @@ const WORD: Record<DeltaDirection, string> = {
 };
 
 /**
- * Insight card for Insights: muted label, paired h2 amounts left/right with
+ * Insight card for Insights: muted label, paired h3 amounts left/right with
  * an ink delta indicator between them (arrow + sign carry direction, never
- * color), and a one-sentence explanation. Amounts use h2 rather than display
- * so the pair fits a single card row at mobile widths.
+ * color), and a one-sentence explanation. h3 keeps realistic NGN pairs on
+ * one line at mobile widths where display roles cannot fit side by side.
  */
 export function InsightCard({
   label,
@@ -75,20 +75,20 @@ export function InsightCard({
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text role="h2" color="ink" numberOfLines={1}>
+            <Text role="h3" color="ink" numberOfLines={1}>
               {formatMinor(primary, currency)}
             </Text>
           </View>
           <Text
             role="small"
             color="ink"
-            style={{ fontWeight: "600", marginHorizontal: spacing.sm }}
+            style={{ fontWeight: "600", marginHorizontal: spacing.xs }}
             testID={testID ? `${testID}-delta` : "insight-delta"}
           >
             {deltaText}
           </Text>
           <View style={{ flex: 1, alignItems: "flex-end" }}>
-            <Text role="h2" color="ink" numberOfLines={1}>
+            <Text role="h3" color="ink" numberOfLines={1}>
               {formatMinor(secondary, currency)}
             </Text>
           </View>

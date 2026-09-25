@@ -40,16 +40,20 @@ interface DonutProps {
   primary: number;
   currency: string;
   labels: { primary: string; secondary: string };
+  /** Hide the built-in legend when the parent renders its own. Default true. */
+  showLegend?: boolean;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
  * Two-arc donut per design.md §7: solid ink base with a hatched primary arc.
- * Center shows a small "Total" label above the display amount; legend below.
- * Animates the arc sweep on mount unless reduced motion. No text inside SVG.
+ * Center shows a small "Total" label above the amount (h2, stepping down to
+ * h3 for long currency strings so realistic totals stay inside the hole);
+ * legend below unless `showLegend` is false. Animates the arc sweep on mount
+ * unless reduced motion. No text inside SVG.
  */
-export function Donut({ total, primary, currency, labels, testID, style }: DonutProps) {
+export function Donut({ total, primary, currency, labels, showLegend = true, testID, style }: DonutProps) {
   const clampedPrimary = Math.min(1, Math.max(0, primary));
   const { progress } = useChartReveal();
   const rawId = useId();
@@ -109,23 +113,25 @@ export function Donut({ total, primary, currency, labels, testID, style }: Donut
           <Text role="small" color="ink">
             Total
           </Text>
-          <Text role="h2">{totalLabel}</Text>
+          <Text role={totalLabel.length > 10 ? "h3" : "h2"}>{totalLabel}</Text>
         </View>
       </View>
-      <ChartLegend
-        entries={[
-          {
-            color: colors.signalYellow,
-            label: labels.primary,
-            value: formatMinor(Math.round(total * clampedPrimary), currency),
-          },
-          {
-            color: colors.ink,
-            label: labels.secondary,
-            value: formatMinor(Math.round(total * (1 - clampedPrimary)), currency),
-          },
-        ]}
-      />
+      {showLegend ? (
+        <ChartLegend
+          entries={[
+            {
+              color: colors.signalYellow,
+              label: labels.primary,
+              value: formatMinor(Math.round(total * clampedPrimary), currency),
+            },
+            {
+              color: colors.ink,
+              label: labels.secondary,
+              value: formatMinor(Math.round(total * (1 - clampedPrimary)), currency),
+            },
+          ]}
+        />
+      ) : null}
       <ChartTextEquivalent description={description} />
     </View>
   );

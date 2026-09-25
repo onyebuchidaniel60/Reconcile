@@ -73,6 +73,7 @@ export function HeroSummaryCard({
             primary={split}
             currency={currency}
             labels={{ primary: "Income", secondary: "Expenses" }}
+            showLegend={false}
             testID={testID ? `${testID}-donut` : "hero-summary-donut"}
           />
         </View>
@@ -80,7 +81,7 @@ export function HeroSummaryCard({
           <ChartLegend
             entries={[
               {
-                color: colors.mint,
+                color: colors.paper,
                 label: "Income",
                 value: formatMinor(income, currency),
               },
