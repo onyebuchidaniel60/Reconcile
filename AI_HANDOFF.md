@@ -500,14 +500,16 @@
   (entry `entry-35c72b36…` carries Phase 8 code; exactly one Supabase-URL
   match; zero secret hits); `curl -sIL /` → 200; deployed Welcome
   screenshot-verified (`phase8-welcome-prod-375.png`).
-- Native: EAS preview APK build (URL below) — smoke test pending operator
-  installation.
+- Native: EAS preview APK build (URL below) — native verification complete
+  (see `Native crash resolved` below; operator verified on the `770dc5c`
+  preview APK, 2026-09-26).
 - Native build: Android preview FINISHED from the fix tree
   (`575645e98f`), SDK 57, 0.1.0 (1), internal distribution. Build page:
   `https://expo.dev/accounts/buchi208/projects/reconcile/builds/c7529ea7-90a6-4245-94c1-7a1fd5cbbfcf`
   APK:
   `https://expo.dev/artifacts/eas/YunMEzHotXNkgRo0NrA1okZ6bu0Yp5HPsaIroEHUGeQ.apk`
-- Note: "Native smoke test pending operator installation at
+- Note: "Native verification complete — see `Native crash resolved` below
+  (operator verified 2026-09-26 on the `770dc5c` preview APK). Pre-fix APK was
   `https://expo.dev/artifacts/eas/YunMEzHotXNkgRo0NrA1okZ6bu0Yp5HPsaIroEHUGeQ.apk`."
   Operator checklist: launch without crash; Welcome → Privacy → Country →
   Sign up → Demo entry → Home; yellow hero + mist card + tinted rows + Home
@@ -556,13 +558,13 @@
 - Deploy: latest build live at `https://reconcile-two-tau.vercel.app`
   (entry verified with Phase 9 markers + avatar entry; exactly one
   Supabase-URL match); `curl -sIL /` → 200.
-- Native (operator-deferred): Phase 8 + 9 native verification deferred by
-  operator decision. Background preview build URL:
+- Native: native verification complete (see `Native crash resolved` below;
+  operator verified all walked screens render without crashing on the
+  `770dc5c` preview APK, 2026-09-26). Background pre-fix preview build URL:
   `https://expo.dev/accounts/buchi208/projects/reconcile/builds/46b70398-a17b-40f6-9138-234bd641c353`.
-  Explicit statement: "Phase 8 and Phase 9 native verification deferred by
-  operator decision. Background preview build URL:
-  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/46b70398-a17b-40f6-9138-234bd641c353`.
-  Native smoke test pending operator installation when convenient."
+  Explicit statement: "Phase 8 and Phase 9 native verification complete —
+  see `Native crash resolved`. UI polish deferred to Phase 10A (web) and
+  Phase 10B (native)."
 
 ## Phase 8 native crash fix (worklet calling non-worklet)
 - Root cause (confirmed by dev-client stack trace): `useAnimatedProps`
@@ -596,6 +598,30 @@
   `https://expo.dev/artifacts/eas/5XhVpsVFzXlKzTvSREKYNL970xio-qvUZBmquQllQ60.apk`
 - Note: "Native smoke test pending operator installation at
   `https://expo.dev/artifacts/eas/5XhVpsVFzXlKzTvSREKYNL970xio-qvUZBmquQllQ60.apk`."
+  (Superseded by `Native crash resolved` below — verified 2026-09-26.)
+
+## Native crash resolved (operator-verified 2026-09-26)
+- Root cause: worklet calling non-worklet functions in Donut.tsx
+  (`describeDonutArc` and its callee `polar`) and LineChart.tsx
+  (`toPointsAttr`). `useAnimatedProps` compiles its callback into a worklet
+  running on the native UI runtime, but the callbacks synchronously called
+  plain-JS helpers ("Tried to synchronously call a Remote Function"). Web
+  survived on the single-thread JS fallback; Android exited.
+- Fix commit: `770dc5c fix: mark chart worklet helpers as worklets (Phase 8
+  native crash)` (plus `262c797` restoring the missing Reanimated babel
+  plugin; `tests/native-safety.test.ts` gates this bug class statically).
+- Verified on device by the operator at preview APK
+  `https://expo.dev/artifacts/eas/5XhVpsVFzXlKzTvSREKYNL970xio-qvUZBmquQllQ60.apk`
+  (built from the fix commit, NOT a dev client).
+- Result: no crashes. Home renders without crashing (the original Donut
+  crash site); Budget renders without crashing (LineChart fix confirmed);
+  Insights loads correctly; Activity, Transaction Detail, Ask Reconcile,
+  Settings all render. No crashes on any screen walked; all 16 screens
+  render.
+- UI polish: some visual corrections are needed — exactly what Phase 10A's
+  web audit and Phase 10B's native pass exist to catch. No functional
+  re-verification of the crash is required.
+- Date of verification: 2026-09-26 (confirmed verbally; recorded here).
 
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
