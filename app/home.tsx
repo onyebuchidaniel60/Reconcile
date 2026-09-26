@@ -1,6 +1,6 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, Pressable, View } from "react-native";
 import { CreditCard, LayoutGrid } from "lucide-react-native";
 import { periodSpend } from "../supabase/functions/_shared/finance";
 import {
@@ -210,7 +210,14 @@ export default function HomeScreen() {
                   marginTop: spacing.md,
                 }}
               >
-                <Avatar displayName={name} size={48} testID="home-avatar" />
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open settings"
+                  onPress={() => router.push("/settings")}
+                  testID="home-avatar-button"
+                >
+                  <Avatar displayName={name} size={48} testID="home-avatar" />
+                </Pressable>
                 <View style={{ flexDirection: "row" }}>
                   <IconButton
                     accessibilityLabel="Open menu"

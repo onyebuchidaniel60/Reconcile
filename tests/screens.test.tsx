@@ -282,6 +282,14 @@ describe("Home screen", () => {
     await fireEvent.press(review);
     expect(mockPush).toHaveBeenCalledWith("/review");
   });
+
+  it("opens Settings from the avatar", async () => {
+    mockSessionEmail = "adaeze@example.com";
+    await render(<HomeScreen />);
+    await screen.findByText("Hey, Adaeze");
+    await fireEvent.press(screen.getByRole("button", { name: "Open settings" }));
+    expect(mockPush).toHaveBeenCalledWith("/settings");
+  });
 });
 
 describe("Review screen", () => {
