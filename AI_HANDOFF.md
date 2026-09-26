@@ -514,6 +514,56 @@
   pill; Review title/starburst/chips/confirm; touch targets; Inter; signup
   keyboard.
 
+## Phase 9 checkpoint (remaining screen rebuilds, web verification only)
+- Commits: `4e3acff feat: rebuild Activity, Detail, Budget, Insights, Ask,
+  and Settings (Phase 9)`, `9928050 fix: insight pair fit, ask basis
+  prefix, settings ellipsis (Phase 9 visual pass)`, `bf90be5 feat: avatar
+  opens Settings plus Phase 9 evidence screenshots`.
+- Screens rebuilt (demo logic preserved, presentation only): Activity
+  (ScreenScaffold, chip scroller All/New/categories/accounts, light rows →
+  detail, pill), Transaction Detail (hero display amount, immutable-facts
+  Card incl. masked account via extended `getTransaction` select, review
+  Card with chips/note/Confirm/Exclude), Budget Setup (FormScaffold,
+  prefilled total + cap rows with circles, secondary Save, create via
+  `createBudget` or update via new `updateBudget`), Budget (paired title,
+  ExpensesBarCard 4-month + callout, SpendTrendCard weekly cumulative +
+  projection, forecast PositiveMessage, cap rows with mini bars + coral
+  over-cap), Insights (3 InsightCards with real numbers + ghost Ask entry +
+  first-month Card), Ask (ink user bubbles, paper answer cards with
+  backend `based on:` line, suggestion chips, pill input + send button),
+  Settings (Account/Privacy/Subscription/About sections, coral sign-out,
+  null-active pill), +not-found (EmptyState) and new offline route
+  (ErrorState + back retry).
+- Shared additions: `tintForLabel` in `src/lib/txn.ts`; `FormScaffold`
+  `ctaVariant`; `PillNav` `active` accepts null; Home avatar → Settings
+  (the pass flow requires an in-app Settings entry).
+- Web pass (Playwright, local + prod, throwaway users, 375 + 1280):
+  full walk Home → Activity (filters narrow per unit tests) → Detail →
+  back → Budget (created via Setup, saved) → Insights (pill) → Ask
+  (grounded) → avatar → Settings → sign out → Welcome. Screenshots
+  `docs/browser-tools/phase9-*.png`. Console/network empty both passes.
+- Defects found and fixed: (1) insight pair ellipsized at h3 on 287px
+  rows → small-600 pair (adjustsFontSizeToFit is iOS-only, single scale
+  kept); (2) Ask rendered "based on: based on:" (backend basis already
+  carries the prefix; old screen rendered it bare) → render basis verbatim,
+  mock updated to the production contract; (3) settings email wrapped
+  mid-word → ellipsis; (4) Home greeting 3-line wrap + split View-all →
+  ellipsis + flex title (Phase 8 follow-ups, same pass).
+- Demo loop intact (sign in → sync → review → confirm → Home → insights →
+  ask). No Phase 10 started.
+- Checks: `tsc` 0, `eslint` 0, `jest` 161 passed / 2 live-skipped,
+  `check:tokens` 0, `expo export` OK (offline route included).
+- Deploy: latest build live at `https://reconcile-two-tau.vercel.app`
+  (entry verified with Phase 9 markers + avatar entry; exactly one
+  Supabase-URL match); `curl -sIL /` → 200.
+- Native (operator-deferred): Phase 8 + 9 native verification deferred by
+  operator decision. Background preview build URL:
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/46b70398-a17b-40f6-9138-234bd641c353`.
+  Explicit statement: "Phase 8 and Phase 9 native verification deferred by
+  operator decision. Background preview build URL:
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/46b70398-a17b-40f6-9138-234bd641c353`.
+  Native smoke test pending operator installation when convenient."
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
