@@ -564,6 +564,39 @@
   `https://expo.dev/accounts/buchi208/projects/reconcile/builds/46b70398-a17b-40f6-9138-234bd641c353`.
   Native smoke test pending operator installation when convenient."
 
+## Phase 8 native crash fix (worklet calling non-worklet)
+- Root cause (confirmed by dev-client stack trace): `useAnimatedProps`
+  compiles its callback into a worklet running on the native UI runtime,
+  but Donut's callback synchronously called plain-JS `describeDonutArc`
+  ("Tried to synchronously call a Remote Function"). Web survived on the
+  single-thread JS fallback; Android exited. Contributing setup cause: the
+  Reanimated babel plugin was missing (added in `262c797`).
+- Fix (`770dc5c fix: mark chart worklet helpers as worklets (Phase 8
+  native crash)`): `'worklet';` as the first line of `describeDonutArc`
+  and its callee `polar` (Donut.tsx), plus `toPointsAttr` (LineChart.tsx)
+  — the only other helper called inside a worklet. Full audit of all 10
+  `useAnimatedProps`/`useAnimatedStyle` sites: BarChart bar math,
+  Starburst, Skeleton, ProgressBar, usePressScale, useCardEntrance,
+  useConfirmPulse use only shared values/Math/inline logic (clean);
+  HatchPattern `<Pattern>` kept (supported on Android; no evidence against
+  it); all Home-tree lucide icons resolve; Donut/Bar/Line path builders
+  guard divide-by-zero; fonts gated in `_layout`; SafeAreaView needs no
+  provider to avoid crashing.
+- New gate `tests/native-safety.test.ts` (4 tests: babel plugin last,
+  SVG allowlist, HatchPattern audited form, all lucide imports resolve;
+  proven to trip with the plugin removed). It catches this bug class
+  statically — on-device verification is still required.
+- Checks on the fix tree: `tsc` 0, `eslint` 0, `jest` 161 passed /
+  2 live-skipped, `check:tokens` 0, `expo export` OK. Web regression:
+  Home hero + gallery donut render identically with hatched arc and
+  animation, console empty (`phase8-worklet-*.png`).
+- New preview APK built from the fix commit (NOT a dev client): build
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/78d7239c-68d0-4c15-8350-a499afda547d`
+  APK:
+  `https://expo.dev/artifacts/eas/5XhVpsVFzXlKzTvSREKYNL970xio-qvUZBmquQllQ60.apk`
+- Note: "Native smoke test pending operator installation at
+  `https://expo.dev/artifacts/eas/5XhVpsVFzXlKzTvSREKYNL970xio-qvUZBmquQllQ60.apk`."
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
