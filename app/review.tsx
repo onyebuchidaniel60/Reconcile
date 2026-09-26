@@ -207,6 +207,7 @@ export default function ReviewScreen() {
                     <Link
                       href={`/transaction/${t.id}`}
                       testID={`review-detail-${t.id}`}
+                      style={{ paddingVertical: spacing.lg }}
                     >
                       <Text role="small" color="paper" style={{ opacity: 0.7 }}>
                         View details

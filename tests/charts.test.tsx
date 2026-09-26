@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react-native";
 import { describe, expect, it } from "@jest/globals";
 import TestRenderer, { act } from "react-test-renderer";
+import { StyleSheet } from "react-native";
 import { Svg, Defs, Pattern } from "react-native-svg";
 import { BarChart, validateBarFills } from "../src/components/BarChart";
 import { CategoryCircle } from "../src/components/CategoryCircle";
@@ -13,6 +14,7 @@ import { LineChart } from "../src/components/LineChart";
 import { PillBadge } from "../src/components/PillBadge";
 import { ProgressBar } from "../src/components/ProgressBar";
 import { Starburst } from "../src/components/Starburst";
+import { colors } from "../src/theme/colors";
 
 const BARS = [
   { label: "Jun", value: 12000, fill: "ink" },
@@ -196,6 +198,24 @@ describe("Wave 5 charts", () => {
     await unmount();
     await render(<LineChart points={points} testID="line-plain" />);
     expect(screen.getByTestId("line-plain")).toBeTruthy();
+  });
+
+  it("LineChart renders paper axis labels on dark surfaces (Phase 10A)", async () => {
+    const points = [
+      { x: 1, y: 300 },
+      { x: 10, y: 260 },
+      { x: 20, y: 310 },
+    ];
+    await render(
+      <LineChart
+        points={points}
+        axisTicks={[{ value: 1, label: "Sept 1" }]}
+        surface="dark"
+        testID="line-dark"
+      />,
+    );
+    const label = screen.getByText("Sept 1");
+    expect(StyleSheet.flatten(label.props.style).color).toBe(colors.paper);
   });
 
   it("charts expose accessible descriptions, not SVG text", async () => {

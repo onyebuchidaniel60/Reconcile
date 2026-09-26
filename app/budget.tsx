@@ -27,6 +27,7 @@ import {
 import {
   formatBoundLabel,
   formatMonthAbbrev,
+  monthSampleDays,
   tintForLabel,
 } from "../src/lib/txn";
 import { colors } from "../src/theme/colors";
@@ -173,21 +174,22 @@ export default function BudgetScreen() {
     fill: index === peakIndex ? ("hatched" as const) : ("ink" as const),
   }));
   const lastDelta = months[3].value - months[2].value;
-  const callout = `${lastDelta < 0 ? "-" : "+"}${formatMinor(Math.abs(lastDelta), currency)}`;
+  // Compact (matches the axis convention): full-precision NGN deltas never
+  // fit the 48px alert-red starburst and spill onto the yellow card.
+  const callout = `${lastDelta < 0 ? "-" : "+"}${formatCompact(Math.abs(lastDelta))}`;
 
   // Month spend, trend points (weekly cumulative), forecast message.
   const monthStart = Date.parse(budget.period_start);
   const monthEnd = Date.parse(budget.period_end);
   const spend = periodSpend(rows, monthStart, monthEnd);
   const spent = Math.max(spend.netMinor, 0);
-  const endDay = new Date(monthEnd - 1).getDate();
-  const sampleDays = [1, Math.ceil(endDay / 3), Math.ceil((2 * endDay) / 3), endDay];
+  const sampleDays = monthSampleDays(budget.period_start);
   const points = sampleDays.map((day) => {
     const at = new Date(now.getFullYear(), now.getMonth(), day).getTime();
     const partial = periodSpend(rows, monthStart, Math.min(at + 86400000, monthEnd));
     return { x: day, y: Math.max(partial.netMinor, 1) };
   });
-  const daysLeft = Math.max(endDay - now.getDate() + 1, 1);
+  const daysLeft = Math.max(sampleDays[sampleDays.length - 1] - now.getDate() + 1, 1);
   const remaining = budget.total_limit_minor - spent;
   const message =
     remaining >= 0
@@ -285,6 +287,14 @@ export default function BudgetScreen() {
                 </View>
               </View>
             ))}
+          </View>
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              title="Edit budget"
+              variant="ghost"
+              onPress={() => router.push("/budget-setup")}
+              testID="budget-edit"
+            />
           </View>
         </View>
         <PillNav

@@ -1,4 +1,4 @@
-import { ScrollView, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, ScrollView, View, type StyleProp, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft } from "lucide-react-native";
 import { colors } from "../theme/colors";
@@ -122,6 +122,20 @@ export function ScreenScaffold({
       testID={testID}
       style={[
         { flex: 1, backgroundColor: dark ? colors.ink : colors.paper },
+        // Web (Phase 10A): self-scrolling screens (scroll={false} + FlatList)
+        // spill past the viewport-capped flex container, so the document
+        // scrolls on the body background — paper, which strands dark-surface
+        // rows on a light background. Let the shell grow with its content on
+        // web only; native keeps flex:1 and internal scrolling untouched.
+        Platform.select({
+          web: {
+            flexGrow: 1,
+            flexShrink: 0,
+            flexBasis: "auto" as const,
+            minHeight: "100%" as const,
+          },
+          default: null,
+        }),
         style,
       ]}
     >

@@ -100,6 +100,7 @@ export default function RootLayout() {
             <Stack.Screen name="insights" options={{ title: "Insights" }} />
             <Stack.Screen name="ask" options={{ title: "Ask Reconcile" }} />
             <Stack.Screen name="settings" options={{ title: "Settings" }} />
+            <Stack.Screen name="offline" options={{ title: "Offline" }} />
           </Stack>
         </AuthGate>
       </SessionProvider>

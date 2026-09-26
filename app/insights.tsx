@@ -157,6 +157,7 @@ export default function InsightsScreen() {
                 deltaDirection={monthDelta.direction}
                 explanation={`Spending is ${monthDelta.direction === "flat" ? "unchanged" : `${monthDelta.direction} ${monthDelta.delta}%`} versus last month.`}
                 currency="NGN"
+                surface="yellow"
                 testID="insights-month"
               />
               {change ? (
@@ -169,6 +170,8 @@ export default function InsightsScreen() {
                     deltaDirection={deltaOf(change.currentMinor, change.previousMinor).direction}
                     explanation={`${labelById.get(change.categoryId) ?? change.categoryId} moved from ${formatMinor(change.previousMinor, "NGN")} to ${formatMinor(change.currentMinor, "NGN")}.`}
                     currency="NGN"
+                    surface="ink"
+                    starburst
                     testID="insights-change"
                   />
                 </View>
@@ -203,7 +206,11 @@ export default function InsightsScreen() {
               testID="insights-ask"
             />
           </View>
-          <Link href="/home" testID="insights-home">
+          <Link
+            href="/home"
+            testID="insights-home"
+            style={{ paddingVertical: spacing.lg }}
+          >
             <Text role="small" color="ink" style={{ opacity: 0.7, marginTop: spacing.sm }}>
               Back home
             </Text>

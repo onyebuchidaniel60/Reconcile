@@ -61,6 +61,9 @@ function SettingRow({
     flexDirection: "row" as const,
     alignItems: "center" as const,
     paddingVertical: spacing.sm,
+    // design.md §10: settings rows are press targets — 44×44 minimum.
+    // alignItems keeps content vertically centered in the taller row.
+    minHeight: 44,
   };
   if (!onPress) {
     return (
@@ -154,7 +157,7 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <ScreenScaffold titleFirst="Set" titleSecond="Settings" testID="settings">
+      <ScreenScaffold titleFirst="Your" titleSecond="Settings" testID="settings">
         <LoadingState variant="row-list" testID="settings-loading" />
       </ScreenScaffold>
     );
@@ -162,14 +165,14 @@ export default function SettingsScreen() {
 
   if (error) {
     return (
-      <ScreenScaffold titleFirst="Set" titleSecond="Settings" testID="settings">
+      <ScreenScaffold titleFirst="Your" titleSecond="Settings" testID="settings">
         <ErrorState message={error} onRetry={refresh} testID="settings-error" />
       </ScreenScaffold>
     );
   }
 
   return (
-    <ScreenScaffold titleFirst="Set" titleSecond="Settings" scroll={false} testID="settings">
+    <ScreenScaffold titleFirst="Your" titleSecond="Settings" scroll={false} testID="settings">
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
           <Text role="small" color="ink" style={{ fontWeight: "600", marginTop: spacing.md }}>
@@ -229,6 +232,7 @@ export default function SettingsScreen() {
             <Link
               href="https://github.com/onyebuchidaniel60/Reconcile"
               testID="settings-opensource"
+              style={{ paddingVertical: spacing.lg }}
             >
               <Text role="body" color="ink">
                 Open source
@@ -237,6 +241,7 @@ export default function SettingsScreen() {
             <Link
               href="https://github.com/onyebuchidaniel60/Reconcile/issues"
               testID="settings-issues"
+              style={{ paddingVertical: spacing.lg }}
             >
               <Text role="body" color="ink">
                 Report an issue
@@ -254,6 +259,7 @@ export default function SettingsScreen() {
                   flexDirection: "row",
                   alignItems: "center",
                   borderRadius: radius.chip,
+                  minHeight: 44,
                 }}
               >
                 <LogOut size={20} color={colors.ink} strokeWidth={1.5} />

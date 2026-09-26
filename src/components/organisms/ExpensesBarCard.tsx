@@ -51,7 +51,13 @@ export function ExpensesBarCard({
           accessibilityLabel="Change expenses range"
           onPress={onPressRange ? handlePressRange : undefined}
           testID={testID ? `${testID}-range` : "expenses-bar-range"}
-          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            // design.md §10: 44×44 minimum; alignItems keeps it centered.
+            minHeight: 44,
+          }}
         >
           <Text role="small" color="ink" style={{ fontWeight: "600" }}>
             Expenses — Last 4 months

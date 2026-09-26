@@ -53,8 +53,12 @@ export function Chip({
               : colors.inkOverlay10,
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
+          // design.md §10: every interactive element meets 44×44 minimum.
+          minHeight: 44,
+          minWidth: 44,
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "center",
         },
         style,
       ]}

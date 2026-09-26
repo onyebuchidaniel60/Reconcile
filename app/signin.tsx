@@ -65,7 +65,11 @@ export default function SignInScreen() {
           testID="signin-password"
         />
       </View>
-      <Link href="/signup" testID="signin-signup">
+      <Link
+        href="/signup"
+        testID="signin-signup"
+        style={{ paddingVertical: spacing.lg }}
+      >
         <Text role="small" color="ink" style={{ marginTop: spacing.md }}>
           No account yet? Create one.
         </Text>

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import type { ReactNode } from "react";
 import * as motion from "../src/theme/motion";
-import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, periodIncome } from "../src/lib/txn";
+import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, monthSampleDays, periodIncome } from "../src/lib/txn";
 import {
   confirmReview,
   connectDemo,
@@ -372,6 +372,12 @@ describe("txn display helpers", () => {
     expect(formatRowDate("2026-09-14T10:00:00.000Z")).toBe("Sept 14");
     expect(formatPeriodLabel(new Date(2026, 8, 1))).toBe("September 2026");
     expect(formatBoundLabel(new Date(2026, 8, 1))).toBe("Sept 1, 2026");
+  });
+
+  it("samples trend days without timezone collapse (Phase 10A)", () => {
+    expect(monthSampleDays("2026-09-01")).toEqual([1, 10, 20, 30]);
+    expect(monthSampleDays("2026-02-01")).toEqual([1, 10, 19, 28]);
+    expect(monthSampleDays("2024-02-01")).toEqual([1, 10, 20, 29]);
   });
 
   it("sums in-month income regardless of eligibility", () => {

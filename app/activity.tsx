@@ -7,6 +7,7 @@ import { ErrorState } from "../src/components/ErrorState";
 import { LoadingState } from "../src/components/LoadingState";
 import { PillNav } from "../src/components/PillNav";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
+import { Text } from "../src/components/Text";
 import { TransactionRow } from "../src/components/TransactionRow";
 import {
   getAccounts,
@@ -109,6 +110,28 @@ export default function ActivityScreen() {
 
   const activeKey = filterKey(filter);
 
+  type SectionItem = { header: string; row?: undefined } | { header?: undefined; row: Transaction };
+
+  // design.md §8: timeline grouped by day with a Label-weight day header.
+  const sections: SectionItem[] = useMemo(() => {
+    const groups = new Map<string, { label: string; rows: Transaction[] }>();
+    for (const t of visible) {
+      const at = new Date(t.occurred_at);
+      const valid = !Number.isNaN(at.getTime());
+      const key = valid
+        ? `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`
+        : t.occurred_at.slice(0, 10);
+      const label = valid ? formatRowDate(t.occurred_at) : t.occurred_at.slice(0, 10);
+      const group = groups.get(key);
+      if (group) group.rows.push(t);
+      else groups.set(key, { label, rows: [t] });
+    }
+    return [...groups.values()].flatMap((g): SectionItem[] => [
+      { header: g.label },
+      ...g.rows.map((row): SectionItem => ({ row })),
+    ]);
+  }, [visible]);
+
   const chips: { key: string; label: string; filter: Filter; testID: string }[] = [
     { key: "all", label: "All", filter: { kind: "all" }, testID: "activity-filter-all" },
     { key: "new", label: "New", filter: { kind: "new" }, testID: "activity-filter-new" },
@@ -171,21 +194,35 @@ export default function ActivityScreen() {
             />
           ) : (
             <FlatList
-              data={visible}
-              keyExtractor={(t) => t.id}
+              data={sections}
+              keyExtractor={(item) => item.header ?? item.row!.id}
               testID="activity-list"
-              renderItem={({ item }) => (
-                <TransactionRow
-                  merchant={item.merchant_name ?? "Unknown"}
-                  date={formatRowDate(item.occurred_at)}
-                  amount={item.amount_minor}
-                  currency={item.currency}
-                  category={categoryTintFor(item, categories)}
-                  direction={directionFor(item)}
-                  onPress={() => router.push(`/transaction/${item.id}`)}
-                  testID={`activity-row-${item.id}`}
-                />
-              )}
+              renderItem={({ item, index }) =>
+                item.header !== undefined ? (
+                  <Text
+                    role="small"
+                    color="ink"
+                    style={{
+                      fontWeight: "600",
+                      marginTop: index === 0 ? spacing.sm : spacing.md,
+                    }}
+                    testID={`activity-day-${item.header}`}
+                  >
+                    {item.header}
+                  </Text>
+                ) : (
+                  <TransactionRow
+                    merchant={item.row!.merchant_name ?? "Unknown"}
+                    date={formatRowDate(item.row!.occurred_at)}
+                    amount={item.row!.amount_minor}
+                    currency={item.row!.currency}
+                    category={categoryTintFor(item.row!, categories)}
+                    direction={directionFor(item.row!)}
+                    onPress={() => router.push(`/transaction/${item.row!.id}`)}
+                    testID={`activity-row-${item.row!.id}`}
+                  />
+                )
+              }
             />
           )}
         </View>

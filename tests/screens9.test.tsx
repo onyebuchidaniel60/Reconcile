@@ -180,6 +180,18 @@ describe("Activity screen", () => {
     await render(<ActivityScreen />);
     expect(await screen.findByText("Offline.")).toBeTruthy();
   });
+
+  it("groups rows under day headers (Phase 10A)", async () => {
+    M(mockGetTransactions).mockResolvedValue([
+      txn(),
+      txn({ id: "t2", merchant_name: "Shoprite", occurred_at: "2026-09-10T09:00:00.000Z" }),
+    ]);
+    await render(<ActivityScreen />);
+    expect(await screen.findByTestId("activity-day-Sept 14")).toBeTruthy();
+    expect(screen.getByTestId("activity-day-Sept 10")).toBeTruthy();
+    expect(screen.getByText("Bolt")).toBeTruthy();
+    expect(screen.getByText("Shoprite")).toBeTruthy();
+  });
 });
 
 describe("Transaction Detail screen", () => {
@@ -269,6 +281,13 @@ describe("Budget screen", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it("offers editing the existing budget (Phase 10A)", async () => {
+    await render(<BudgetScreen />);
+    await screen.findByTestId("budget-expenses");
+    await fireEvent.press(screen.getByRole("button", { name: "Edit budget" }));
+    expect(mockPush).toHaveBeenCalledWith("/budget-setup");
   });
 });
 

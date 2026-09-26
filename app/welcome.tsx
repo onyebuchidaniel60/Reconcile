@@ -19,7 +19,11 @@ export default function WelcomeScreen() {
       <View style={{ alignItems: "center", marginVertical: spacing.md }}>
         <Starburst variant="signal-yellow" size={48} testID="welcome-accent" />
       </View>
-      <Link href="/signin" testID="welcome-signin">
+      <Link
+        href="/signin"
+        testID="welcome-signin"
+        style={{ paddingVertical: spacing.lg }}
+      >
         <Text role="small" color="ink" style={{ textAlign: "center" }}>
           I already have an account? Sign in.
         </Text>

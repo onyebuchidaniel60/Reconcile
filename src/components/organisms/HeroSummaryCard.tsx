@@ -59,7 +59,12 @@ export function HeroSummaryCard({
             accessibilityLabel={`Change period, currently ${period}`}
             onPress={onPressPeriod ? handlePressPeriod : undefined}
             testID={testID ? `${testID}-period` : "hero-summary-period"}
-            style={{ flexDirection: "row", alignItems: "center" }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              // design.md §10: 44×44 minimum; alignItems keeps it centered.
+              minHeight: 44,
+            }}
           >
             <Text role="small" color="ink" style={{ fontWeight: "600" }}>
               {period}

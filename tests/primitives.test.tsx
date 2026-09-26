@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { describe, expect, it, jest } from "@jest/globals";
+import { StyleSheet } from "react-native";
 import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { Chip } from "../src/components/Chip";
@@ -124,6 +125,13 @@ describe("Wave 2 primitives", () => {
     expect(
       screen.getByTestId("chip-on").props.accessibilityState.selected,
     ).toBe(true);
+  });
+
+  it("Chip meets the 44px minimum touch target (Phase 10A)", async () => {
+    await render(<Chip label="All" onPress={() => {}} testID="chip-44" />);
+    const style = StyleSheet.flatten(screen.getByTestId("chip-44").props.style);
+    expect(style.minHeight).toBe(44);
+    expect(style.minWidth).toBe(44);
   });
 });
 

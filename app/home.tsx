@@ -296,7 +296,11 @@ export default function HomeScreen() {
                     testID="home-recent-title"
                   />
                 </View>
-                <Link href="/activity" testID="home-view-all">
+                <Link
+                  href="/activity"
+                  testID="home-view-all"
+                  style={{ paddingVertical: spacing.lg }}
+                >
                   <Text role="small" color="paper" style={{ opacity: 0.7 }}>
                     View all
                   </Text>

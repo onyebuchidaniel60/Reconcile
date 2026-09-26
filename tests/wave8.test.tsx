@@ -229,6 +229,28 @@ describe("Wave 8 InsightCard", () => {
       await unmount();
     }
   });
+
+  it("renders yellow and ink surfaces with a starburst option (Phase 10A)", async () => {
+    const props = {
+      label: "L",
+      primary: 100,
+      secondary: 200,
+      delta: 50,
+      deltaDirection: "down" as const,
+      explanation: "E",
+      currency: "NGN",
+    };
+    const { unmount } = await render(
+      <InsightCard {...props} surface="yellow" testID="insight-y" />,
+    );
+    expect(screen.getByTestId("insight-y")).toBeTruthy();
+    expect(screen.queryByTestId("insight-y-starburst")).toBeNull();
+    await unmount();
+    await render(
+      <InsightCard {...props} surface="ink" starburst testID="insight-k" />,
+    );
+    expect(screen.getByTestId("insight-k-starburst")).toBeTruthy();
+  });
 });
 
 describe("Wave 8 ReviewHeader", () => {

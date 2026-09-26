@@ -78,7 +78,11 @@ export default function SignUpScreen() {
           Check your inbox to confirm your email, then sign in.
         </Text>
       ) : null}
-      <Link href="/signin" testID="signup-signin">
+      <Link
+        href="/signin"
+        testID="signup-signin"
+        style={{ paddingVertical: spacing.lg }}
+      >
         <Text role="small" color="ink" style={{ marginTop: spacing.md }}>
           Already have an account? Sign in.
         </Text>

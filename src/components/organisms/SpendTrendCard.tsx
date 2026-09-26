@@ -68,6 +68,7 @@ export function SpendTrendCard({
             points={points}
             projectedFrom={projectedFrom}
             axisTicks={axisTicks}
+            surface="dark"
             testID={testID ? `${testID}-chart` : "spend-trend-chart"}
           />
         </View>

@@ -125,3 +125,21 @@ export function formatBoundLabel(date: Date): string {
 export function formatMonthAbbrev(date: Date): string {
   return SHORT_MONTHS[date.getMonth()];
 }
+
+/**
+ * Sample days for the monthly trend chart, e.g. [1, 10, 20, 30].
+ * Parses the YYYY-MM-DD period start directly: the old
+ * `new Date(monthEndMs - 1).getDate()` collapses to day 1 in UTC+X
+ * timezones (Sept 30 23:59 UTC is Oct 1 locally), which stacked every
+ * trend point onto a single dot. Local month-length math is exact.
+ */
+export function monthSampleDays(periodStartIso: string): number[] {
+  const [year, month] = periodStartIso.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return [
+    1,
+    Math.ceil(daysInMonth / 3),
+    Math.ceil((2 * daysInMonth) / 3),
+    daysInMonth,
+  ];
+}

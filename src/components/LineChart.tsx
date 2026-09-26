@@ -21,6 +21,8 @@ interface LineChartProps {
   width?: number;
   height?: number;
   cornerStarburst?: boolean;
+  /** "dark" renders axis labels in paper for ink-card usage (design.md §14). */
+  surface?: "light" | "dark";
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -65,6 +67,7 @@ export function LineChart({
   width = 300,
   height = 160,
   cornerStarburst = false,
+  surface = "light",
   testID,
   style,
 }: LineChartProps) {
@@ -145,7 +148,12 @@ export function LineChart({
           }}
         >
           {axisTicks.map((tick) => (
-            <Text key={tick.label} role="small" style={{ opacity: 0.6 }}>
+            <Text
+              key={tick.label}
+              role="small"
+              color={surface === "dark" ? "paper" : "ink"}
+              style={{ opacity: 0.6 }}
+            >
               {tick.label}
             </Text>
           ))}
