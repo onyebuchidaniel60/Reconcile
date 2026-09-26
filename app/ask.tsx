@@ -118,7 +118,7 @@ export default function AskScreen() {
                   </Text>
                   {item.basis ? (
                     <Text role="small" color="ink" style={{ opacity: 0.6, marginTop: spacing.xs }}>
-                      based on: {item.basis}
+                      {item.basis}
                     </Text>
                   ) : null}
                 </Card>

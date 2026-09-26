@@ -149,7 +149,7 @@ beforeEach(() => {
     txn: txn(),
     review: { status: "needs_review", category_id: "transport", user_note: null },
   });
-  M(mockAskQuestion).mockResolvedValue({ answer: "You spent ₦72,765.74 on Food.", basis: "Food spend" });
+  M(mockAskQuestion).mockResolvedValue({ answer: "You spent ₦72,765.74 on Food.", basis: "based on: Food spend" });
   M(mockGetActiveConnection).mockResolvedValue({ id: "c1" });
   M(mockCreateBudget).mockResolvedValue(undefined);
   M(mockUpdateBudget).mockResolvedValue(undefined);

@@ -45,7 +45,7 @@ function SettingRow({
     <>
       {icon}
       <View style={{ flex: 1, marginLeft: spacing.md }}>
-        <Text role="body" color="ink" style={{ fontWeight: "500" }}>
+        <Text role="body" color="ink" style={{ fontWeight: "500" }} numberOfLines={1}>
           {label}
         </Text>
         {hint ? (

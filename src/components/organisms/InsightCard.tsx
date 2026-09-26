@@ -38,10 +38,12 @@ const WORD: Record<DeltaDirection, string> = {
 };
 
 /**
- * Insight card for Insights: muted label, paired h3 amounts left/right with
- * an ink delta indicator between them (arrow + sign carry direction, never
- * color), and a one-sentence explanation. h3 keeps realistic NGN pairs on
- * one line at mobile widths where display roles cannot fit side by side.
+ * Insight card for Insights: muted label, paired small-600 amounts
+ * left/right with an ink delta indicator between them (arrow + sign carry
+ * direction, never color), and a one-sentence explanation. Amounts stay at
+ * the small scale so realistic NGN pairs fit one row on both surfaces —
+ * larger roles clip on 360px widths (adjustsFontSizeToFit is iOS-only, so a
+ * single scale is used everywhere).
  */
 export function InsightCard({
   label,
@@ -75,7 +77,7 @@ export function InsightCard({
           }}
         >
           <View style={{ flex: 1 }}>
-            <Text role="h3" color="ink" numberOfLines={1}>
+            <Text role="small" color="ink" style={{ fontWeight: "600" }} numberOfLines={1}>
               {formatMinor(primary, currency)}
             </Text>
           </View>
@@ -88,7 +90,7 @@ export function InsightCard({
             {deltaText}
           </Text>
           <View style={{ flex: 1, alignItems: "flex-end" }}>
-            <Text role="h3" color="ink" numberOfLines={1}>
+            <Text role="small" color="ink" style={{ fontWeight: "600" }} numberOfLines={1}>
               {formatMinor(secondary, currency)}
             </Text>
           </View>
