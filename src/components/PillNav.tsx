@@ -23,7 +23,8 @@ const ITEMS: PillItem[] = [
 ];
 
 interface PillNavProps {
-  active: PillRoute;
+  /** Active route, or null for screens with no pill item (e.g. Settings). */
+  active: PillRoute | null;
   onNavigate: (route: PillRoute) => void;
   surface?: PillSurface;
   testID?: string;

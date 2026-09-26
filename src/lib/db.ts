@@ -51,7 +51,7 @@ export interface Transaction {
   normalized_merchant: string | null;
   budget_eligible: boolean;
   transaction_reviews: TxnReview[];
-  bank_accounts?: { display_name: string | null } | null;
+  bank_accounts?: { display_name: string | null; masked_account_number?: string | null } | null;
 }
 
 export interface ReviewItem {
@@ -212,7 +212,7 @@ export async function getTransaction(
   const { data, error } = await getSupabase()
     .from("transactions")
     .select(
-      "id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,transaction_reviews(status,category_id,user_note),bank_accounts(display_name)",
+      "id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,transaction_reviews(status,category_id,user_note),bank_accounts(display_name,masked_account_number)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -363,6 +363,37 @@ export async function createBudget(
     const { error: capError } = await supabase.from("budget_categories").insert(
       caps.map((c) => ({
         budget_id: (data as { id: string }).id,
+        category_id: c.category_id,
+        limit_minor: c.limit_minor,
+      })),
+    );
+    if (capError) throw new Error(friendly(capError, "Budget saved, but caps failed."));
+  }
+}
+
+/** Update the monthly total and replace the category caps. User-owned rows only. */
+export async function updateBudget(
+  budgetId: string,
+  totalLimitMinor: number,
+  caps: BudgetCap[],
+): Promise<void> {
+  const supabase = getSupabase();
+  const userId = await currentUserId();
+  const { error } = await supabase
+    .from("budgets")
+    .update({ total_limit_minor: totalLimitMinor })
+    .eq("id", budgetId)
+    .eq("user_id", userId);
+  if (error) throw new Error(friendly(error, "Could not save budget."));
+  const { error: deleteError } = await supabase
+    .from("budget_categories")
+    .delete()
+    .eq("budget_id", budgetId);
+  if (deleteError) throw new Error(friendly(deleteError, "Could not save budget caps."));
+  if (caps.length > 0) {
+    const { error: capError } = await supabase.from("budget_categories").insert(
+      caps.map((c) => ({
+        budget_id: budgetId,
         category_id: c.category_id,
         limit_minor: c.limit_minor,
       })),

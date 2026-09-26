@@ -1,6 +1,6 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import {
   biggestCategoryChange,
   formatMinor,
@@ -8,13 +8,22 @@ import {
   periodSpend,
   topMerchant,
 } from "../supabase/functions/_shared/finance";
+import { Button } from "../src/components/Button";
+import { Card } from "../src/components/Card";
+import { EmptyState } from "../src/components/EmptyState";
+import { ErrorState } from "../src/components/ErrorState";
+import { InsightCard, type DeltaDirection } from "../src/components/organisms/InsightCard";
+import { LoadingState } from "../src/components/LoadingState";
+import { PillNav } from "../src/components/PillNav";
+import { ScreenScaffold } from "../src/components/ScreenScaffold";
+import { Text } from "../src/components/Text";
 import {
   getCategories,
   getTransactions,
   type Category,
   type Transaction,
 } from "../src/lib/db";
-import { PillNav } from "../src/components/PillNav";
+import { spacing } from "../src/theme/spacing";
 
 const PILL_ROUTES = {
   home: "/home",
@@ -33,6 +42,17 @@ function monthBounds(back: number): { start: number; end: number } {
   return { start, end };
 }
 
+type Semantic = "income" | "expense" | "external_transfer" | "internal_transfer" | "refund" | "unknown";
+
+function deltaOf(current: number, previous: number): { delta: number; direction: DeltaDirection } {
+  if (previous <= 0) {
+    return { delta: current > 0 ? 100 : 0, direction: current > previous ? "up" : "flat" };
+  }
+  const pct = Math.round((Math.abs(current - previous) / previous) * 100);
+  if (current === previous) return { delta: 0, direction: "flat" };
+  return { delta: pct, direction: current > previous ? "up" : "down" };
+}
+
 export default function InsightsScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -41,10 +61,7 @@ export default function InsightsScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   const fetchData = useCallback(async () => {
-    const [rows, cats] = await Promise.all([
-      getTransactions(500),
-      getCategories(),
-    ]);
+    const [rows, cats] = await Promise.all([getTransactions(500), getCategories()]);
     return { rows, cats };
   }, []);
 
@@ -84,29 +101,22 @@ export default function InsightsScreen() {
 
   if (loading) {
     return (
-      <View>
-        <Text>Loading...</Text>
-      </View>
+      <ScreenScaffold titleFirst="This" titleSecond="Month" testID="insights">
+        <LoadingState variant="card-hero" testID="insights-loading" />
+      </ScreenScaffold>
     );
   }
+
   if (error) {
     return (
-      <View>
-        <Text>{error}</Text>
-        <Text onPress={refresh}>Retry</Text>
-        <Link href="/home">Back home</Link>
-      </View>
+      <ScreenScaffold titleFirst="This" titleSecond="Month" testID="insights">
+        <ErrorState message={error} onRetry={refresh} testID="insights-error" />
+      </ScreenScaffold>
     );
   }
 
   const rows = txns.map((t) => ({
-    semanticType: t.semantic_type as
-      | "income"
-      | "expense"
-      | "external_transfer"
-      | "internal_transfer"
-      | "refund"
-      | "unknown",
+    semanticType: t.semantic_type as Semantic,
     categoryId: t.transaction_reviews[0]?.category_id ?? undefined,
     merchantKey: t.normalized_merchant ?? undefined,
     merchantName: t.merchant_name ?? undefined,
@@ -117,59 +127,94 @@ export default function InsightsScreen() {
   const cur = monthBounds(0);
   const prev = monthBounds(1);
   const labelById = new Map(categories.map((c) => [c.id, c.label]));
-
-  if (!hasHistory(rows, prev.start, prev.end)) {
-    const curSpend = periodSpend(rows, cur.start, cur.end);
-    return (
-      <View>
-        <Text>Insights (Demo)</Text>
-        <Text>First month: not enough history for comparisons yet.</Text>
-        <Text>
-          Spent so far this month: {formatMinor(Math.max(curSpend.netMinor, 0), "NGN")}
-        </Text>
-        <Text>Demo data is synthetic.</Text>
-        <Link href="/ask">Ask Reconcile</Link>
-        <Link href="/home">Back home</Link>
-      </View>
-    );
-  }
+  const fresh = !hasHistory(rows, prev.start, prev.end);
 
   const curSpend = periodSpend(rows, cur.start, cur.end);
   const prevSpend = periodSpend(rows, prev.start, prev.end);
+  const curNet = Math.max(curSpend.netMinor, 0);
+  const prevNet = Math.max(prevSpend.netMinor, 0);
+  const monthDelta = deltaOf(curNet, prevNet);
   const change = biggestCategoryChange(rows, cur.start, cur.end, prev.start, prev.end);
   const top = topMerchant(rows, cur.start, cur.end);
 
   return (
-    <View>
-      <Text>Insights (Demo)</Text>
-      <Text>Demo data is synthetic.</Text>
-      <Text>
-        This month: {formatMinor(Math.max(curSpend.netMinor, 0), "NGN")} · Last
-        month: {formatMinor(Math.max(prevSpend.netMinor, 0), "NGN")}
-      </Text>
-      {change ? (
-        <Text>
-          Biggest change: {labelById.get(change.categoryId) ?? change.categoryId} (
-          {formatMinor(change.previousMinor, "NGN")} →{" "}
-          {formatMinor(change.currentMinor, "NGN")})
-        </Text>
-      ) : (
-        <Text>No category changes to show.</Text>
-      )}
-      {top ? (
-        <Text>
-          Top merchant: {top.name} ({formatMinor(top.totalMinor, "NGN")})
-        </Text>
-      ) : (
-        <Text>No merchant spending to show.</Text>
-      )}
-      <Link href="/ask">Ask Reconcile</Link>
-      <Link href="/home">Back home</Link>
-      <PillNav
-        active="insights"
-        onNavigate={(route) => router.push(PILL_ROUTES[route])}
-        testID="insights-pill"
-      />
-    </View>
+    <ScreenScaffold titleFirst="This" titleSecond="Month" scroll={false} testID="insights">
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>
+          {fresh ? (
+            <Card variant="paper" testID="insights-first-month">
+              <Text role="body" color="ink">
+                Insights arrive after your first month.
+              </Text>
+            </Card>
+          ) : (
+            <View>
+              <InsightCard
+                label="This month vs last month"
+                primary={curNet}
+                secondary={prevNet}
+                delta={monthDelta.delta}
+                deltaDirection={monthDelta.direction}
+                explanation={`Spending is ${monthDelta.direction === "flat" ? "unchanged" : `${monthDelta.direction} ${monthDelta.delta}%`} versus last month.`}
+                currency="NGN"
+                testID="insights-month"
+              />
+              {change ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <InsightCard
+                    label="Biggest category change"
+                    primary={change.currentMinor}
+                    secondary={change.previousMinor}
+                    delta={deltaOf(change.currentMinor, change.previousMinor).delta}
+                    deltaDirection={deltaOf(change.currentMinor, change.previousMinor).direction}
+                    explanation={`${labelById.get(change.categoryId) ?? change.categoryId} moved from ${formatMinor(change.previousMinor, "NGN")} to ${formatMinor(change.currentMinor, "NGN")}.`}
+                    currency="NGN"
+                    testID="insights-change"
+                  />
+                </View>
+              ) : null}
+              {top && curNet > 0 ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <InsightCard
+                    label="Top merchant"
+                    primary={top.totalMinor}
+                    secondary={curNet}
+                    delta={Math.round((top.totalMinor / curNet) * 100)}
+                    deltaDirection="flat"
+                    explanation={`${top.name} is your top merchant at ${formatMinor(top.totalMinor, "NGN")} this month.`}
+                    currency="NGN"
+                    testID="insights-merchant"
+                  />
+                </View>
+              ) : null}
+            </View>
+          )}
+          {txns.length === 0 && fresh ? (
+            <EmptyState
+              message="No transactions yet. Insights need data first."
+              testID="insights-empty"
+            />
+          ) : null}
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              title="Ask Reconcile"
+              variant="ghost"
+              onPress={() => router.push("/ask")}
+              testID="insights-ask"
+            />
+          </View>
+          <Link href="/home" testID="insights-home">
+            <Text role="small" color="ink" style={{ opacity: 0.7, marginTop: spacing.sm }}>
+              Back home
+            </Text>
+          </Link>
+        </View>
+        <PillNav
+          active="insights"
+          onNavigate={(route) => router.push(PILL_ROUTES[route])}
+          testID="insights-pill"
+        />
+      </View>
+    </ScreenScaffold>
   );
 }

@@ -3,7 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
 import { layout } from "../theme/layout";
 import { spacing } from "../theme/spacing";
-import { Button } from "./Button";
+import { Button, type ButtonVariant } from "./Button";
 import { PairedTitle } from "./PairedTitle";
 import { Text } from "./Text";
 
@@ -13,6 +13,7 @@ interface FormScaffoldProps {
   subtitle?: string;
   ctaTitle: string;
   onCta?: () => void;
+  ctaVariant?: ButtonVariant;
   ctaDisabled?: boolean;
   ctaLoading?: boolean;
   ctaAccessibilityLabel?: string;
@@ -35,6 +36,7 @@ export function FormScaffold({
   subtitle,
   ctaTitle,
   onCta,
+  ctaVariant = "primary",
   ctaDisabled = false,
   ctaLoading = false,
   ctaAccessibilityLabel,
@@ -95,6 +97,7 @@ export function FormScaffold({
         >
           <Button
             title={ctaTitle}
+            variant={ctaVariant}
             onPress={onCta}
             disabled={ctaDisabled}
             loading={ctaLoading}

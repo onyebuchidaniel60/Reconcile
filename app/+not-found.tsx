@@ -1,36 +1,28 @@
-import { Link, Stack } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
-import { body, colors, h2, spacing } from "../src/theme";
+import { Stack, useRouter } from "expo-router";
+import { View } from "react-native";
+import { Button } from "../src/components/Button";
+import { EmptyState } from "../src/components/EmptyState";
+import { ScreenScaffold } from "../src/components/ScreenScaffold";
 
 export default function NotFoundScreen() {
+  const router = useRouter();
   return (
-    <View style={styles.container}>
+    <ScreenScaffold testID="not-found">
       <Stack.Screen options={{ title: "Not found" }} />
-      <Text style={styles.title}>Not found</Text>
-      <Link href="/" style={styles.link}>
-        Back home
-      </Link>
-    </View>
+      <View>
+        <EmptyState
+          message="This page doesn't exist."
+          action={
+            <Button
+              title="Back home"
+              variant="secondary"
+              onPress={() => router.push("/home")}
+              testID="not-found-home"
+            />
+          }
+          testID="not-found-empty"
+        />
+      </View>
+    </ScreenScaffold>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.paper,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: spacing.xl,
-  },
-  title: {
-    fontSize: h2.fontSize,
-    fontWeight: h2.fontWeight,
-    color: colors.ink,
-  },
-  link: {
-    marginTop: spacing.xl,
-    fontSize: body.fontSize,
-    color: colors.ink,
-    textDecorationLine: "underline",
-  },
-});

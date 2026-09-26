@@ -58,6 +58,11 @@ function isTintName(label: string): label is CategoryTintName {
   );
 }
 
+/** Canonical label → circle tint, defaulting to Shopping. */
+export function tintForLabel(label: string): CategoryTintName {
+  return isTintName(label) ? label : "Shopping";
+}
+
 /**
  * Review category (or semantic fallback) → tinted circle category.
  * Accepts an explicit suggestion id (review rows carry it outside the
@@ -74,7 +79,7 @@ export function categoryTintFor(
   const categoryId = explicitCategoryId ?? embedded ?? null;
   if (categoryId) {
     const label = categories.find((c) => c.id === categoryId)?.label;
-    if (label && isTintName(label)) return label;
+    if (label) return tintForLabel(label);
   }
   if (txn.semantic_type === "income") return "Income";
   return "Shopping";
@@ -114,4 +119,9 @@ export function formatPeriodLabel(now: Date): string {
 /** Month bound label, e.g. "Sept 1, 2026". */
 export function formatBoundLabel(date: Date): string {
   return `${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+}
+
+/** Short month label for chart axes, e.g. "Sept". */
+export function formatMonthAbbrev(date: Date): string {
+  return SHORT_MONTHS[date.getMonth()];
 }

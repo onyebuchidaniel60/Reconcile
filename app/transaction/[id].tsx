@@ -1,7 +1,18 @@
-import { Link, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { View } from "react-native";
 import { formatMinor } from "../../supabase/functions/_shared/finance";
+import { Button } from "../../src/components/Button";
+import { Card } from "../../src/components/Card";
+import { Chip } from "../../src/components/Chip";
+import { Divider } from "../../src/components/Divider";
+import { EmptyState } from "../../src/components/EmptyState";
+import { ErrorState } from "../../src/components/ErrorState";
+import { Input } from "../../src/components/Input";
+import { LoadingState } from "../../src/components/LoadingState";
+import { ScreenScaffold } from "../../src/components/ScreenScaffold";
+import { Text } from "../../src/components/Text";
+import { spacing } from "../../src/theme/spacing";
 import {
   confirmReview,
   excludeReview,
@@ -12,8 +23,33 @@ import {
   type TxnReview,
 } from "../../src/lib/db";
 
+function FactRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: spacing.sm,
+      }}
+    >
+      <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+        {label}
+      </Text>
+      <Text
+        role="body"
+        color="ink"
+        style={{ textAlign: "right", marginLeft: spacing.md, flexShrink: 1 }}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [txn, setTxn] = useState<Transaction | null>(null);
@@ -93,67 +129,125 @@ export default function TransactionDetailScreen() {
 
   if (loading) {
     return (
-      <View>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
-  if (error || !txn) {
-    return (
-      <View>
-        <Text>{error ?? "Transaction not found."}</Text>
-        <Link href="/review">Back to review</Link>
-      </View>
+      <ScreenScaffold onBack={() => router.back()} backLabel="Back" testID="detail">
+        <LoadingState variant="card-hero" testID="detail-loading" />
+      </ScreenScaffold>
     );
   }
 
+  if (error || !txn) {
+    return (
+      <ScreenScaffold onBack={() => router.back()} backLabel="Back" testID="detail">
+        <ErrorState
+          message={error ?? "Transaction not found."}
+          onRetry={refresh}
+          testID="detail-error"
+        />
+      </ScreenScaffold>
+    );
+  }
+
+  const amountLabel = `${txn.direction === "credit" ? "+" : "-"}${formatMinor(
+    txn.amount_minor,
+    txn.currency,
+  )}`;
+  const chosen = picked ?? review?.category_id ?? "other";
+
   return (
-    <View>
-      <Text>Transaction (Demo)</Text>
-      <Text>
-        {formatMinor(txn.amount_minor, txn.currency)} {txn.direction}
+    <ScreenScaffold onBack={() => router.back()} backLabel="Back" testID="detail">
+      <Text
+        role="display"
+        color="ink"
+        style={{ textAlign: "center", fontVariant: ["tabular-nums"] }}
+        testID="detail-amount"
+      >
+        {amountLabel}
       </Text>
-      <Text>Merchant: {txn.merchant_name ?? "Unknown"}</Text>
-      <Text>Bank: {txn.bank_accounts?.display_name ?? "Unknown account"}</Text>
-      <Text>Date: {txn.occurred_at.slice(0, 10)}</Text>
-      <Text>Narration: {txn.narration ?? "-"}</Text>
-      <Text>Type: {txn.semantic_type}</Text>
-      <Text>Review status: {review?.status ?? "none"}</Text>
-      <Text>Category</Text>
-      {categories.map((c) => (
-        <Pressable
-          key={c.id}
-          accessibilityRole="button"
-          accessibilityLabel={`Set ${c.label}`}
-          onPress={() => setPicked(c.id)}
-        >
-          <Text>
-            {c.label}
-            {picked === c.id ? " (selected)" : ""}
+      <Text
+        role="body"
+        color="ink"
+        style={{ textAlign: "center", marginTop: spacing.xs }}
+        testID="detail-merchant"
+      >
+        {txn.merchant_name ?? "Unknown"}
+      </Text>
+      <View style={{ marginTop: spacing.md }}>
+        <Card variant="paper" testID="detail-facts">
+          <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+            Transaction facts
           </Text>
-        </Pressable>
-      ))}
-      <Text>Note</Text>
-      <TextInput value={note} onChangeText={setNote} accessibilityLabel="Note" />
-      {error ? <Text>{error}</Text> : null}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Save category"
-        onPress={() => save(false)}
-        disabled={busy}
-      >
-        <Text>Save</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Exclude transaction"
-        onPress={() => save(true)}
-        disabled={busy}
-      >
-        <Text>Exclude</Text>
-      </Pressable>
-      <Link href="/review">Back to review</Link>
-      <Link href="/activity">Activity</Link>
-    </View>
+          <FactRow label="Bank" value={txn.bank_accounts?.display_name ?? "Unknown"} />
+          <Divider />
+          <FactRow
+            label="Account"
+            value={txn.bank_accounts?.masked_account_number ?? txn.bank_accounts?.display_name ?? "Unknown"}
+          />
+          <Divider />
+          <FactRow label="Date" value={txn.occurred_at.slice(0, 10)} />
+          <Divider />
+          <FactRow label="Narration" value={txn.narration ?? "-"} />
+        </Card>
+      </View>
+      <View style={{ marginTop: spacing.md }}>
+        <Card variant="paper" testID="detail-review">
+          <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+            Your review
+          </Text>
+          <Text role="small" color="ink" style={{ opacity: 0.6, marginTop: spacing.xs }}>
+            Status: {review?.status ?? "none"}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: spacing.sm }}>
+            {categories.map((c) => (
+              <View key={c.id} style={{ margin: spacing.xs }}>
+                <Chip
+                  label={c.label}
+                  selected={chosen === c.id}
+                  accessibilityLabel={`Set ${c.label}`}
+                  onPress={() => setPicked(c.id)}
+                  testID={`detail-chip-${c.id}`}
+                />
+              </View>
+            ))}
+          </View>
+          <View style={{ marginTop: spacing.sm }}>
+            <Input
+              label="Note"
+              value={note}
+              onChangeText={setNote}
+              placeholder="Optional note"
+              testID="detail-note"
+            />
+          </View>
+          {error ? <Text role="body" color="ink">{error}</Text> : null}
+          <View style={{ marginTop: spacing.md }}>
+            <Button
+              title={busy ? "Saving..." : "Confirm"}
+              onPress={() => save(false)}
+              disabled={busy}
+              loading={busy}
+              testID="detail-confirm"
+            />
+          </View>
+          <View style={{ marginTop: spacing.sm }}>
+            <Button
+              title="Exclude transaction"
+              variant="secondary"
+              onPress={() => save(true)}
+              disabled={busy}
+              accessibilityLabel="Exclude transaction"
+              testID="detail-exclude"
+            />
+          </View>
+        </Card>
+      </View>
+      {txn.transaction_reviews.length === 0 && !review ? (
+        <View style={{ marginTop: spacing.md }}>
+          <EmptyState
+            message="No review yet. Pick a category above."
+            testID="detail-noreview"
+          />
+        </View>
+      ) : null}
+    </ScreenScaffold>
   );
 }
