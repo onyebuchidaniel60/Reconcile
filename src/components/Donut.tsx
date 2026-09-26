@@ -18,12 +18,14 @@ const RADIUS = 80;
 const STROKE = 22;
 
 function polar(angleDeg: number): [number, number] {
+  "worklet";
   const radians = ((angleDeg - 90) * Math.PI) / 180;
   return [CENTER + RADIUS * Math.cos(radians), CENTER + RADIUS * Math.sin(radians)];
 }
 
 /** SVG arc path for a fractional sweep starting at a fractional offset. */
 export function describeDonutArc(fraction: number, startFraction = 0): string {
+  "worklet";
   const clamped = Math.min(0.9999, Math.max(0.0001, fraction));
   const start = startFraction * 360;
   const sweep = clamped * 360;

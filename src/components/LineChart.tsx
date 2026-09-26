@@ -49,6 +49,7 @@ function scalePoints(
 }
 
 function toPointsAttr(scaled: { px: number; py: number }[]): string {
+  "worklet";
   return scaled.map((p) => `${p.px.toFixed(1)},${p.py.toFixed(1)}`).join(" ");
 }
 
