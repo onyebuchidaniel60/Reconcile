@@ -1,7 +1,8 @@
 # Phase 10 — Native audit checklist (operator device walk)
 
-Preview APK: <FILL AFTER PART E — preview APK URL>
-Built from: <FILL — Phase 10A fix commit hash>
+Preview APK: https://expo.dev/artifacts/eas/LHawpHx2JkEqF9WH8bqihfdvPV4VCAI9pUxu3dCd0Qg.apk
+Built from: c0eb4cf (fix: phase 10 web audit — visual and accessibility defects)
+Build page: https://expo.dev/accounts/buchi208/projects/reconcile/builds/58daa587-8af7-49cd-9894-fe95febc5ac6
 Device used: <FILL — model + Android version>
 
 How to report back: copy the "RESULT TEMPLATE" section at the bottom into a

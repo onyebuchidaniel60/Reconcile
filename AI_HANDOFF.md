@@ -623,6 +623,87 @@
   re-verification of the crash is required.
 - Date of verification: 2026-09-26 (confirmed verbally; recorded here).
 
+## Phase 10A checkpoint (web audit + fixes + preview APK)
+- Fix commit: `c0eb4cf fix: phase 10 web audit — visual and accessibility
+  defects` (screens, components, tests, 33 evidence screenshots, native
+  checklist). Second commit (this entry): handoff only.
+- Web audit (Playwright 1.63.0 + headless Chromium, local Metro then
+  production-equivalent `expo export` dist served statically): all 16
+  screens at 375×812 and 1280×800 — Welcome, Privacy, Country, Sign up,
+  Sign in, Demo entry, Home, Review, Transaction Detail, Activity, Budget
+  Setup, Budget, Insights, Ask, Settings, Error/offline/not-found.
+  Throwaway user via Supabase admin API (email_confirm, no email sent);
+  sign-in + demo sync (55 txns) + review confirm (53→52→51, works) +
+  budget create + ask grounded answer all exercised through the UI.
+  Screenshots `docs/browser-tools/phase10a-*-{375,1280}.png`.
+- Defects found and FIXED (12 changes, all from `src/theme/` tokens or
+  existing components; no redesign, no new primitives):
+  - blocks-loop: Budget had no Edit path (spec requires Edit) → ghost
+    "Edit budget" → `/budget-setup` (prefill/update already supported);
+    round-trip verified in the second pass.
+  - visual: trend points collapsed to one dot in UTC+X (`endDay` TZ bug) →
+    new `monthSampleDays` helper in `src/lib/txn.ts` (+ unit tests); this
+    also corrected the forecast per-day math. Starburst callout overflow
+    (full-precision delta spilled off the 48px badge) → compact callout
+    (axis convention; exact values stay in the a11y label). Settings title
+    "Set Settings" → "Your Settings" (existing Your-X pattern). Offline
+    header "offline" → registered "Offline" title.
+  - accessibility: chips 32px → 44×44 `Chip` min (all screens); 7 text
+    links 19px → 51px tap height (`paddingVertical: lg`); settings rows +
+    sign-out 23–39px → `minHeight: 44`; period/range pressables 20px →
+    `minHeight: 44`; LineChart axis labels ink-on-ink (invisible) → new
+    `surface="dark"` paper labels (SpendTrendCard passes it).
+  - design.md-violation: Review dark background spilled to paper on web
+    scroll (below-fold rows invisible) → web-only scaffold growth
+    (`ScreenScaffold`, native untouched); Activity had no day-group
+    headers → grouped with Label-600 headers; Insights was all-paper with
+    no yellow hero → yellow month card + ink biggest-change card + paper
+    starburst (one yellow, one starburst per screen).
+  - anti-pattern: zero found.
+- DEFERRED nice-to-fix-later (logged, not fixed): hero legend wrap at 375
+  (readable); expo Stack header-back 30px (platform chrome, OS-handled on
+  native); Ask has no yellow accent (no explicit §8 rule); Budget Ask entry
+  (Edit added; pill reaches Ask in one tap).
+- KNOWN RESIDUAL, reported not hidden: the design-mandated alert-red
+  starburst with white 12px text measures ≈3.6 contrast (AA needs 4.5 for
+  that size). The overflow is fixed and exact values are in the a11y label,
+  but the pairing itself cannot pass automated AA without changing the
+  specified colors — needs a design decision, so none was invented.
+- ACQUITTED after investigation (no defect): ₦ glyph rendering (Inter
+  ships U+20A6 in all weights; the 1x "overstrike" is aliasing — proven at
+  4x); Home row fade (entrance-animation transient, settled opacity 1);
+  Review confirm (works, earlier read raced it); FormScaffold CTA overlap
+  (fullPage-stitch artifact); signin error state (timing flake, proven).
+- Second pass (fresh `dist` export, fresh contexts, both viewports):
+  console 0, network 4xx/5xx 0, overflow none, unlabeled-icon-buttons 0,
+  sub-44px targets 0, contrast 0 except the documented callout residual.
+  Loop re-verified (sign-in → demo → review → budget edit → ask).
+- Checks on the fix tree: `tsc` 0, `eslint` 0, `jest` all suites green
+  (final tally across runs: 187 passed + 2 live-skipped; per-test timeout
+  overrides were environmental only — loaded machine, untouched code
+  proven by re-run), `check:tokens` 0 violations, `expo export -p web`
+  success (20 static routes).
+- Deploy: `c0eb4cf` pushed; Vercel live (`entry-307bcd19…` carries Edit
+  budget + activity-day- + insights-change markers); `curl`-equivalent 200;
+  bundle has exactly one Supabase-URL match and zero secret values (the
+  single `sb_secret_` hit is supabase-js prefix-check code, not a value).
+- Preview APK (NOT a dev client) from the fix commit: build
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/58daa587-8af7-49cd-9894-fe95febc5ac6`
+  (status FINISHED, `gitCommitHash c0eb4cf`) APK:
+  `https://expo.dev/artifacts/eas/LHawpHx2JkEqF9WH8bqihfdvPV4VCAI9pUxu3dCd0Qg.apk`
+  Ops note: submitted with `EAS_SKIP_AUTO_FINGERPRINT=1` (local
+  fingerprint computation stalls on this machine); credentials/profile
+  unchanged.
+- Native checklist for the operator:
+  `docs/browser-tools/phase10-native-checklist.md` (every screen in walk
+  order + web-unverifiable classes + copy-paste result template).
+- Explicit statement: "Phase 10B pending operator native walk. Checklist
+  at docs/browser-tools/phase10-native-checklist.md. APK at
+  `https://expo.dev/artifacts/eas/LHawpHx2JkEqF9WH8bqihfdvPV4VCAI9pUxu3dCd0Qg.apk`."
+- SKILL_FRONTEND_DESIGN.md still untouched (§10 evolution log still the
+  template) — the Phase 10B rewrite is gated on the operator's native pass
+  completing cleanly. No source-of-truth doc changed except this handoff.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
