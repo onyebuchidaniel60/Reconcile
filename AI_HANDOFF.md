@@ -6,29 +6,33 @@
 cross-bank transaction reconciliation, budgeting, and read-only financial
 insights. Repo: `github.com/onyebuchidaniel60/Reconcile`.
 
-**Current phase:** Phase 10B close — pending operator re-verification.
+**Current phase:** Phase 10B close — **COMPLETE**. Frontend layer
+(Phases 3–10) is complete. Phase 11 has not started.
 
 | Fact | Value |
 |---|---|
-| Last verified APK (operator is installing this) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` |
+| Last verified APK (operator-verified on device) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` |
 | Live web alias | `https://reconcile-uhhh2.vercel.app` |
 | Last phase commit (Phase 10B.5) | `53d4c0e fix: unify home and budget month spend; wire home month selector (Phase 10B.5)` |
-| Handoff commit (this file) | `dc010ce` — `docs: remediation of AI_HANDOFF.md for session continuity` |
+| Phase 10B close — plan status correction | `cbe00ae` — `docs: update implementation plan status after phase 10b.5` |
+| Phase 10B close — skill rewrite | `6716b2c` — `docs: rewrite SKILL_FRONTEND_DESIGN.md v1 from accumulated evidence` |
 | `demo-v1` tag | `991851b` (unchanged since the demo phase closed) |
 | Source-of-truth doc index | "Source-of-truth document index", immediately below |
 | Environment / credentials | "Environment state", immediately below |
 
-> The "Handoff commit" row names `dc010ce`, the commit that introduced this
-> block. The commit that replaced the `HEAD` placeholder with that hash is
-> `docs: fix handoff commit hash reference` — a docs-only follow-up. To find
-> the most recent update to this file: `git log -n 1 -- AI_HANDOFF.md`.
+> This file's most recent update is `git log -n 1 -- AI_HANDOFF.md`. The two
+> `cbe00ae`/`6716b2c` commits above are the Phase 10B close; the commit
+> containing this block is a docs-only follow-up, so the hash of the latter is
+> deliberately not hard-coded here.
 
 **What the next session does.** Read this file top to bottom. Confirm state
-with `git fetch origin && git status` (tree should be clean, HEAD should be
-the handoff commit). Then, only after the operator confirms the Phase 10B.5
-APK above on a real device, run **Phase 10B close** — the
-`SKILL_FRONTEND_DESIGN.md` v1 rewrite scoped and seeded in "Phase 10B close —
-scope and lessons to encode" below. Do not start Phase 11.
+with `git fetch origin && git status` (tree should be clean, HEAD should be the
+handoff commit). The frontend layer is closed and gated: do not reopen it
+without a stated reason. The next task is **Phase 11 — Mono integration**,
+briefed in "Phase 11 — Mono integration" below. Phase 11 requires Mono business
+onboarding/KYB and sandbox keys. If they are not available, implement the
+adapter against a mock and explicitly flag live verification as pending — do
+not silently narrow the phase, and do not claim a live loop that was not run.
 
 Everything below this block is per-phase history, newest checkpoint at the
 bottom of that run of entries. Historical sections are preserved verbatim as
@@ -53,9 +57,11 @@ Every document a session may need, and what each one governs:
 - `design.md` — visual and interaction source of truth. Wins on visual
   conflicts.
 - `frontend-implementation-plan.md` — frontend build order.
-- `SKILL_FRONTEND_DESIGN.md` — the skill earned at Phase 10B close
-  (currently a blueprint placeholder, not yet rewritten; §10 evolution log
-  still empty).
+- `SKILL_FRONTEND_DESIGN.md` — **v1, earned and complete.** Rewritten at the
+  Phase 10B close (`6716b2c`) from the evidence of Phases 3–10. Thirteen
+  sections; a dated evolution-log entry per phase (Phases 3 → 10B.5); ten
+  earned rules; unearned rules explicitly marked "inherited — pending
+  validation". v2 is owed after a human review of a full screen set.
 - `AI_HANDOFF.md` — this file. Current state and per-phase checkpoints.
 
 ## Environment state
@@ -91,17 +97,32 @@ Do **not** use `reconcile-jhmath5cq-uhhh2.vercel.app` — it is stale and still
 serves an old bundle. `reconcile-two-tau.vercel.app` also still resolves and
 tracks current deploys.
 
-## Phase 10B close — scope and lessons to encode
+## Phase 10B close — scope and lessons encoded
 
-### Part 1 — What Phase 10B close does
+> **STATUS: DONE.** The operator verified the Phase 10B.5 APK on a real Android
+> device (all checks pass), which released the gate. The close ran as two
+> commits: `cbe00ae` (plan status correction) and `6716b2c` (skill rewrite).
+> The sections below are preserved as the record of **what the close had to
+> encode** — the scope it was seeded with and the evidence behind each rule.
+> The lessons are now written into `SKILL_FRONTEND_DESIGN.md` v1 §9 and §10;
+> this section is the source they were distilled from, not a to-do list.
 
-Phase 10B close rewrites `SKILL_FRONTEND_DESIGN.md` v1 from the evidence
-Phases 3–10 actually accumulated. The file currently exists (from blueprint
-commit `38be36f`) but is unchanged since then — its §10 evolution log is
-empty. The close is the moment the skill is earned: it replaces the
-placeholder with a v1 that encodes the distilled rules below.
-`SKILL_FRONTEND_DESIGN.md` is not touched until the operator has verified the
-Phase 10B.5 APK on device, and the close runs in a fresh session.
+### Part 1 — What Phase 10B close did
+
+Phase 10B close rewrote `SKILL_FRONTEND_DESIGN.md` v1 from the evidence
+Phases 3–10 actually accumulated. The file pre-existed from blueprint commit
+`38be36f` as a placeholder with an empty evolution log. The close replaced it
+wholesale: 13 sections, a dated evolution-log entry per phase (Phase 3 → Phase
+10B.5), the ten lessons restated as portable rules, the three method lessons,
+the observed anti-patterns, and adoption instructions. The gate held — the file
+was not touched until the operator confirmed the device pass.
+
+The rewrite is portable by construction: no Reconcile hex codes, spacing
+values, screen names, or file paths appear in it. Each rule states the failure
+class and its rationale, not the bug it came from. Rules this project never had
+the occasion to test are marked "inherited — pending validation" rather than
+laundered into earned rules (four such rules are listed at the end of the
+skill's §12).
 
 ### Part 2 — Ten lessons to encode
 
@@ -166,7 +187,7 @@ Phase 10B.5 APK on device, and the close runs in a fresh session.
 | 9. 3.6:1 starburst residual | Phase 10A KNOWN RESIDUAL |
 | 10. Worklet/non-worklet crash | Phase 8 native crash + "Native crash resolved" |
 
-## Phase 11 — Mono integration (next after Phase 10B close)
+## Phase 11 — Mono integration (next; frontend layer is closed)
 
 - Replaces the demo provider with the real Mono adapter, behind the
   **unchanged** `FinancialProvider` interface. Do not change the interface.
@@ -193,27 +214,96 @@ Phase 10B.5 APK on device, and the close runs in a fresh session.
   pending.
 - Commit: `feat: add mono financial data provider (Phase 11)`.
 
-## Open flags carried into Phase 10B close
+## Phase 10B close checkpoint (frontend layer complete)
 
-- **APK hash stamp.** The Phase 10B.5 build's `gitCommitHash` and
-  `gitCommitMessage` came back empty from the EAS API (submit ran from a
-  background job without git context, with `EAS_NO_VCS` set). The archive is
-  still the correct code — build started 15:53, commit `53d4c0e` landed 15:39,
-  `git diff 53d4c0e..HEAD` empty — so it is trustworthy by tree equality, not
-  by a stamped hash. Re-run the build in the foreground if a stamped artifact
-  is wanted.
-- **Budget Overview card hides on prior months by design** (Phase 10B.5 Fix B).
-  Budgets are per-calendar-month rows and only the current month's is fetched,
-  so showing it would compare the selected month's spend against the current
-  month's limit. Confirm the operator accepts this.
-- **Stale URL.** `reconcile-jhmath5cq-uhhh2.vercel.app` is stale. Use
-  `https://reconcile-uhhh2.vercel.app`.
-- **Phase 10B.5 seed timing.** Early in a calendar month the current month
-  holds very few demo rows (1–4), so a prior month can look fuller. Existing
-  seed shape, not a regression.
-- **Known deferred from Phase 10A:** hero legend wrap at 375; Ask Reconcile
-  yellow entry tint; Budget Ask entry; white-on-alert-red 12px callout
-  contrast.
+**Explicit statement: "Frontend layer (Phases 3–10) complete. Phase 11 not
+started."**
+
+The operator verified the Phase 10B.5 APK
+(`https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk`)
+on a real Android device — all checks pass. That verification released the gate
+that had held `SKILL_FRONTEND_DESIGN.md` untouched since blueprint commit
+`38be36f`, and the close ran in the following session.
+
+**Commits**
+
+| Commit | Change |
+|---|---|
+| `cbe00ae` | `docs: update implementation plan status after phase 10b.5` — corrected plan status drift (Task 1) |
+| `6716b2c` | `docs: rewrite SKILL_FRONTEND_DESIGN.md v1 from accumulated evidence` — the skill (Task 2) |
+| this commit | `docs: update handoff after phase 10b close` — this file |
+
+**Task 1 — `IMPLEMENTATION_PLAN.md` status drift, corrected.** The plan marked
+Phase 7 "In progress" and listed nothing for Phases 8–10, contradicting this
+file. `AI_HANDOFF.md` wins per its own precedence rule, but the plan was the
+stale artifact and is now correct. Added Phase 7–10 rows to the completed-phases
+table (Phase 10 marked in progress, sub-phase detail in the status cell) and
+changed Phase 7's status line to Complete. Phase sequence, numbering, and
+acceptance criteria untouched — this was a status correction only. Also added a
+pointer under the table naming `AI_HANDOFF.md` as authoritative on status so
+the drift cannot recur silently.
+
+**Task 2 — `SKILL_FRONTEND_DESIGN.md` v1, written.** The placeholder (1,374
+words, 13 stub sections, empty evolution log) was replaced by an earned v1
+(7,882 words). Thirteen sections: core principle, reading order, component-first
+workflow, reference-driven decisions, motion as first-class, visual validation
+gate, agent-as-user verification protocol, deployment gate, ten earned rules,
+method lessons, observed anti-patterns, evolution log, adoption.
+
+- The ten lessons became rules stated as failure classes with a rationale, not
+  as bug notes (§9). Portable: no Reconcile hex codes, spacing values, screen
+  names, or file paths appear anywhere in the file.
+- The three method lessons became §10.
+- The evolution log (§12) carries twelve dated entries — Phase 3, 4, 5, 6, 7, 7
+  native, 8, 8 native crash, 9, 10A, 10A.5+10B, 10B.5 — each in the §16 format,
+  populated from the corresponding checkpoint in this file. Nothing invented.
+- The anti-pattern list (§11) was pruned to what actually occurred on this
+  project, and one rule is marked **superseded**: "disabling the framework
+  header fixes the chrome everywhere", superseded by the verify-each-surface
+  rule after one commit fixed web and broke native.
+- Four rules this project never had the occasion to test are marked **inherited
+  — pending validation** and collected in a "not yet earned" block: large OS
+  font settings, notched-device safe areas, a second mobile platform, and
+  touch-target measurement on hardware. The skill states that an unearned,
+  unmarked rule is a defect in the file.
+
+**Scope.** Docs-only session. No application code changed, no schema or
+migration touched, no `supabase/` change, no dependency change, no new test.
+`git diff` across the three commits touches exactly three files:
+`IMPLEMENTATION_PLAN.md`, `SKILL_FRONTEND_DESIGN.md`, `AI_HANDOFF.md`.
+
+**What the close does NOT do.** It does not start Phase 11, does not reopen
+the frontend layer, and does not amend `design.md`. `design.md` still carries
+exactly the two authorised amendments from Phases 10A.5 and 10B.
+
+**Skill v2 is owed.** Per `frontend-implementation-plan.md` §16, v2 follows a
+full set of screens being deployed, reviewed by a human, and fixed. The
+frontend layer closed on operator device verification rather than on a second
+human review pass, so v2 has not yet been earned.
+
+## Open flags — resolved or carried
+
+- **APK hash stamp — resolved.** The Phase 10B.5 build's `gitCommitHash` and
+  `gitCommitMessage` came back empty from the EAS API (the submit ran from a
+  background job without git context, with `EAS_NO_VCS` set). The archive was
+  trustworthy by tree equality, not by a stamped hash: build started 15:53,
+  commit `53d4c0e` landed 15:39. The operator has since installed and verified
+  that artifact, which is stronger evidence than a stamp. A foreground re-run is
+  only needed if a stamped artifact is wanted for the record.
+- **Budget Overview card hides on prior months by design — accepted.** Budgets
+  are per-calendar-month rows and only the current month's is fetched, so
+  showing it would compare the selected month's spend against the current
+  month's limit. Verified on device with the Phase 10B.5 APK.
+- **Stale URL — still true, still ignored.** `reconcile-jhmath5cq-uhhh2.vercel.app`
+  is stale. Use `https://reconcile-uhhh2.vercel.app`.
+- **Phase 10B.5 seed timing — not a defect.** Early in a calendar month the
+  current month holds very few demo rows (1–4), so a prior month looks fuller.
+  Existing seed shape.
+- **Deferred UI items, carried forward** (not regressions; each is a named
+  nice-to-fix with a recorded reason): hero legend wrap at 375; Ask Reconcile
+  yellow entry tint; Budget Ask entry; white-on-alert-red 12px starburst callout
+  contrast (~3.6:1 against AA's 4.5:1 — mandated by `design.md` §3/§7, so fixing
+  it requires a `design.md` decision, not a code patch).
 
 ---
 
@@ -1494,24 +1584,32 @@ Use:
 `IMPLEMENT → TEST → INSPECT → FIX → COMMIT → CHECKPOINT → STOP`
 
 ## Current phase
-**Phase 10B close — pending operator re-verification.** Phases 3–10B.5 are
-implemented, tested, and committed; the Phase 10B.5 APK is with the operator.
+**Phase 10B close — COMPLETE. Frontend layer (Phases 3–10) complete.** Phase 11
+has not started. The operator verified the Phase 10B.5 APK on device, and the
+close delivered `IMPLEMENTATION_PLAN.md` status correction (`cbe00ae`) plus
+`SKILL_FRONTEND_DESIGN.md` v1 (`6716b2c`).
 
 This section was previously "Current phase: Phase 1". That was stale and
 superseded — see "Current state" at the top of this file, which is
 authoritative.
 
 ## Next exact task
-The operator verifies the Phase 10B.5 APK
-(`https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk`)
-on a real Android device. Once they confirm, **Phase 10B close** rewrites
-`SKILL_FRONTEND_DESIGN.md` v1 from accumulated evidence — scoped and seeded in
-"Phase 10B close — scope and lessons to encode" above. The skill stays
-untouched until that verification completes.
+**Phase 11 — Mono integration.** Replace the demo provider with the real Mono
+adapter behind the **unchanged** `FinancialProvider` interface. Full brief in
+"Phase 11 — Mono integration" above and `IMPLEMENTATION_PLAN.md` §Phase 11.
 
-**After Phase 10B close:** Phase 11 — Mono integration (see the brief above
-and `IMPLEMENTATION_PLAN.md` §Phase 11).
+**Blocking external dependency.** Mono business onboarding/KYB and sandbox keys
+must be available. If they are not, Phase 11 must implement the adapter and
+test it against a mock, and must **explicitly flag live verification as
+pending** — in the phase report, in `AI_HANDOFF.md`, and in the commit
+message. Do not claim a live sandbox loop that was not run, and do not silently
+narrow the phase.
 
+Phase 11 must also add the missing `provider_events` table and its RLS (no such
+table exists; migrations `000001`–`000004` create `sync_runs` only) so webhook
+processing can be idempotent.
+
+Phase 10B close is done and must not be reopened without a stated reason.
 Before changing code in any phase:
 1. inspect repository state (`git fetch origin && git status`);
 2. read the source-of-truth docs listed in the index at the top of this file;
