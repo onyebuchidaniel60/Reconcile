@@ -23,6 +23,8 @@ interface InputProps {
   accessibilityLabel?: string;
   /** "dark" renders the label in paper for ink surfaces (field stays paper). */
   tone?: "light" | "dark";
+  /** Overrides the label weight (e.g. "600" for a field heading). */
+  labelWeight?: "400" | "500" | "600" | "700";
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -43,6 +45,7 @@ export function Input({
   error,
   accessibilityLabel,
   tone = "light",
+  labelWeight,
   testID,
   style,
 }: InputProps) {
@@ -50,7 +53,11 @@ export function Input({
   const hasError = !!error;
   return (
     <View style={style} testID={testID}>
-      <Text role="small" color={tone === "dark" ? "paper" : "ink"}>
+      <Text
+        role="small"
+        color={tone === "dark" ? "paper" : "ink"}
+        style={labelWeight ? { fontWeight: labelWeight } : undefined}
+      >
         {label}
       </Text>
       <TextInput

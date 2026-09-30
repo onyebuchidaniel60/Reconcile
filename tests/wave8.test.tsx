@@ -70,6 +70,53 @@ describe("Wave 8 HeroSummaryCard", () => {
 });
 
 describe("Wave 8 BudgetOverviewCard", () => {
+  /** Find the first node whose flattened style carries `backgroundColor`. */
+  function nodeWithBg(tree: unknown, bg: string): boolean {
+    let hit = false;
+    const walk = (node: unknown): void => {
+      if (hit) return;
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (!node || typeof node !== "object") return;
+      const style = (node as { props?: { style?: unknown } }).props?.style;
+      const first = Array.isArray(style) ? style[0] : style;
+      if (
+        first &&
+        typeof first === "object" &&
+        (first as { backgroundColor?: string }).backgroundColor === bg
+      ) {
+        hit = true;
+        return;
+      }
+      walk((node as { children?: unknown }).children);
+    };
+    walk(tree);
+    return hit;
+  }
+
+  function zoneStyle(tree: unknown): { width?: string; alignItems?: string } | null {
+    let out: { width?: string; alignItems?: string } | null = null;
+    const walk = (node: unknown): void => {
+      if (out) return;
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (!node || typeof node !== "object") return;
+      const props = (node as { props?: { testID?: string; style?: unknown } }).props;
+      if (props?.testID?.endsWith("-label-zone")) {
+        const first = Array.isArray(props.style) ? props.style[0] : props.style;
+        out = (first ?? {}) as { width?: string; alignItems?: string };
+        return;
+      }
+      walk((node as { children?: unknown }).children);
+    };
+    walk(tree);
+    return out;
+  }
+
   it("renders the label, Today badge, percentage, and date range", async () => {
     await render(
       <BudgetOverviewCard
@@ -92,6 +139,105 @@ describe("Wave 8 BudgetOverviewCard", () => {
         "Budget overview. Spent ₦125,000.00 of ₦250,000.00, Sept 1, 2026 to Sept 30, 2026.",
       ),
     ).toBeTruthy();
+  });
+
+  it("shows used and remaining amounts as Spent / Left (Phase 10B, Fix A)", async () => {
+    await render(
+      <BudgetOverviewCard
+        spent={15000000}
+        limit={25000000}
+        currency="NGN"
+        periodStart="Sept 1, 2026"
+        periodEnd="Sept 30, 2026"
+        progress={0.6}
+        testID="budget-split"
+      />,
+    );
+    // 60% used, per the reference: the percentage names the filled portion.
+    expect(screen.getByText("60%")).toBeTruthy();
+    expect(screen.getByText("Spent")).toBeTruthy();
+    expect(screen.getByText("₦150,000.00")).toBeTruthy();
+    expect(screen.getByText("Left")).toBeTruthy();
+    expect(screen.getByText("₦100,000.00")).toBeTruthy();
+  });
+
+  it("reads 100% and full fill at exactly the limit", async () => {
+    const { toJSON } = await render(
+      <BudgetOverviewCard
+        spent={25000000}
+        limit={25000000}
+        currency="NGN"
+        periodStart="Sept 1, 2026"
+        periodEnd="Sept 30, 2026"
+        progress={1}
+        testID="budget-at"
+      />,
+    );
+    expect(screen.getByText("100%")).toBeTruthy();
+    expect(screen.getByText("Left")).toBeTruthy();
+    expect(screen.getByText("₦0.00")).toBeTruthy();
+    // At the limit is not over budget: ink fill, not alert red.
+    expect(nodeWithBg(toJSON(), colors.alertRed)).toBe(false);
+    expect(nodeWithBg(toJSON(), colors.ink)).toBe(true);
+  });
+
+  it("switches the right row to Over with the overdraft in alert red", async () => {
+    const { toJSON } = await render(
+      <BudgetOverviewCard
+        spent={30250000}
+        limit={25000000}
+        currency="NGN"
+        periodStart="Sept 1, 2026"
+        periodEnd="Sept 30, 2026"
+        progress={1.21}
+        testID="budget-over-row"
+      />,
+    );
+    expect(screen.getByText("121%")).toBeTruthy();
+    expect(screen.queryByText("Left")).toBeNull();
+    expect(screen.getByText("Over")).toBeTruthy();
+    expect(screen.getByText("₦52,500.00")).toBeTruthy();
+    expect(nodeWithBg(toJSON(), colors.alertRed)).toBe(true);
+  });
+
+  it("keeps the percentage pill visible when the fill is tiny (Phase 10B, Fix A)", async () => {
+    const { toJSON } = await render(
+      <BudgetOverviewCard
+        spent={125000}
+        limit={25000000}
+        currency="NGN"
+        periodStart="Sept 1, 2026"
+        periodEnd="Sept 30, 2026"
+        progress={0.05}
+        testID="budget-tiny"
+      />,
+    );
+    // 5% fill: below the edge-anchor ratio, so the pill is right-anchored to
+    // the fill edge rather than centred in a sliver.
+    expect(screen.getByText("5%")).toBeTruthy();
+    const zone = zoneStyle(toJSON());
+    expect(zone).not.toBeNull();
+    expect(zone?.alignItems).toBe("flex-end");
+    // The pill zone is floored so the pill can never be clipped by a 5% fill.
+    expect(zone?.width).toBe("15%");
+  });
+
+  it("centres the pill over a wide fill (Phase 10B, Fix A)", async () => {
+    const { toJSON } = await render(
+      <BudgetOverviewCard
+        spent={17500000}
+        limit={25000000}
+        currency="NGN"
+        periodStart="Sept 1, 2026"
+        periodEnd="Sept 30, 2026"
+        progress={0.7}
+        testID="budget-wide"
+      />,
+    );
+    expect(screen.getByText("70%")).toBeTruthy();
+    const zone = zoneStyle(toJSON());
+    expect(zone?.alignItems).toBe("center");
+    expect(zone?.width).toBe("70%");
   });
 
   it("renders over-budget uncapped with an alert-red fill (Phase 10A.5)", async () => {

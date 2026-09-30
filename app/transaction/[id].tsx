@@ -12,12 +12,17 @@ import { Input } from "../../src/components/Input";
 import { LoadingState } from "../../src/components/LoadingState";
 import { ScreenScaffold } from "../../src/components/ScreenScaffold";
 import { Text } from "../../src/components/Text";
+import { Pencil } from "lucide-react-native";
+import { IconButton } from "../../src/components/IconButton";
+import { select } from "../../src/lib/haptics";
+import { colors } from "../../src/theme/colors";
 import { spacing } from "../../src/theme/spacing";
 import {
   confirmReview,
   excludeReview,
   getCategories,
   getTransaction,
+  setReviewDisplayName,
   type Category,
   type Transaction,
   type TxnReview,
@@ -58,6 +63,10 @@ export default function TransactionDetailScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [note, setNote] = useState("");
+  // Phase 10B (Fix C): inline rename of the user-owned display name. The raw
+  // provider narration below is never edited.
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState("");
   const [busy, setBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -128,6 +137,35 @@ export default function TransactionDetailScreen() {
     }
   };
 
+  /** Phase 10B (Fix C): save the display name only — no status or category
+   *  change, so an `excluded` review stays excluded. */
+  const saveName = async () => {
+    if (!txn) return;
+    const next = draftName.trim();
+    setBusy(true);
+    setError(null);
+    try {
+      if (next.length > 0) await setReviewDisplayName(txn.id, next);
+      await refresh();
+      setRenaming(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rename failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startRename = (): void => {
+    void select();
+    setDraftName(resolveDisplayName(review, txn!));
+    setRenaming(true);
+  };
+
+  const cancelRename = (): void => {
+    setDraftName("");
+    setRenaming(false);
+  };
+
   if (loading) {
     return (
       <ScreenScaffold onBack={() => router.back()} backLabel="Back" testID="detail">
@@ -153,6 +191,9 @@ export default function TransactionDetailScreen() {
     txn.currency,
   )}`;
   const chosen = picked ?? review?.category_id ?? "other";
+  // Phase 10B (Fix C): rename is only offered once a review row exists —
+  // there is nothing to write `display_name` on before the first review.
+  const canRename = !!review || txn.transaction_reviews.length > 0;
 
   return (
     <ScreenScaffold onBack={() => router.back()} backLabel="Back" testID="detail">
@@ -164,17 +205,71 @@ export default function TransactionDetailScreen() {
       >
         {amountLabel}
       </Text>
-      <Text
-        role="body"
-        color="ink"
-        style={{ textAlign: "center", marginTop: spacing.xs }}
-        testID="detail-merchant"
-      >
-        {/* Phase 10A.5 (Fix 7): the title follows the user's display name.
-          The raw provider narration stays visible, and uneditable, in the
-          "Narration" fact row below. */}
-        {resolveDisplayName(review, txn)}
-      </Text>
+      {renaming ? (
+        <View style={{ marginTop: spacing.md }} testID="detail-rename">
+          <Input
+            label="Name this transaction"
+            labelWeight="600"
+            value={draftName}
+            onChangeText={setDraftName}
+            placeholder="What was this for?"
+            testID="detail-rename-input"
+          />
+          <View style={{ flexDirection: "row", marginTop: spacing.sm }}>
+            <View style={{ flex: 1, marginRight: spacing.sm }}>
+              <Button
+                title="Cancel"
+                variant="ghost"
+                onPress={cancelRename}
+                disabled={busy}
+                testID="detail-rename-cancel"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title={busy ? "Saving..." : "Save"}
+                onPress={saveName}
+                disabled={busy}
+                loading={busy}
+                testID="detail-rename-save"
+              />
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: spacing.xs,
+          }}
+        >
+          <Text
+            role="body"
+            color="ink"
+            style={{ textAlign: "center", flexShrink: 1 }}
+            testID="detail-merchant"
+          >
+            {/* Phase 10A.5 (Fix 7): the title follows the user's display name.
+              The raw provider narration stays visible, and uneditable, in the
+              "Narration" fact row below. */}
+            {resolveDisplayName(review, txn)}
+          </Text>
+          {canRename ? (
+            <View style={{ marginLeft: spacing.xs }}>
+              <IconButton
+                accessibilityLabel="Rename transaction"
+                onPress={startRename}
+                tone="light"
+                testID="detail-rename-open"
+              >
+                <Pencil size={20} color={colors.ink} strokeWidth={1.5} />
+              </IconButton>
+            </View>
+          ) : null}
+        </View>
+      )}
       <View style={{ marginTop: spacing.md }}>
         <Card variant="paper" testID="detail-facts">
           <Text role="small" color="ink" style={{ fontWeight: "600" }}>

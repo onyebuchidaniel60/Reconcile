@@ -292,8 +292,14 @@ Rules:
   Donut chart center with hatched + solid arcs. Center label "Total" + large amount.
   Below donut: split legend — left "● Income" + amount, right "◎ Expenses" + amount.
 - **Mist card:** "Budget Overview" label + "Today" black pill badge.
-  Horizontal progress bar with "50%" white pill on the filled left portion and hatched
-  pattern on the remaining right portion. Date range labels below ("Sept 1, 2023" / "Sept 30, 2023").
+  Horizontal progress bar 28px tall on a `Paper`-at-60% track: the spent
+  portion filled left (Ink, or Alert Red when over budget) with a white pill
+  carrying the percentage centred over it, and the remaining portion carrying
+  the diagonal hatch pattern on the right.
+  Below the bar a split row names both halves: "Spent" left, "Left" right,
+  each with its amount beneath in tabular figures. When over budget the right
+  label becomes "Over" and its amount is the overdraft, in Alert Red.
+  Date range labels below that ("Sept 1, 2023" / "Sept 30, 2023").
 - Below: recent activity rows (3–5) and an Ask Reconcile ghost/entry.
 - Floating pill nav at the bottom, Ink pill with yellow selected circle.
 

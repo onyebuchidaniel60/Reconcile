@@ -26,6 +26,30 @@ import DemoScreen from "../app/demo";
 import HomeScreen from "../app/home";
 import ReviewScreen from "../app/review";
 
+/**
+ * Document order of a set of testIDs within a rendered tree, used to assert
+ * that one element sits above another without depending on layout.
+ */
+function collectOrder(tree: unknown, wanted: Record<string, string>): string[] {
+  const found: string[] = [];
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    const id = (node as { props?: { testID?: string } }).props?.testID;
+    if (id) {
+      for (const [key, value] of Object.entries(wanted)) {
+        if (id === value) found.push(key);
+      }
+    }
+    walk((node as { children?: unknown }).children);
+  };
+  walk(tree);
+  return found;
+}
+
 // Screen renders compile many modules on first mount; allow headroom under
 // parallel load so the suite is deterministic on saturated machines.
 jest.setTimeout(20000);
@@ -342,7 +366,7 @@ describe("Review screen", () => {
   it("saves an edited display name on confirm (Phase 10A.5)", async () => {
     await render(<ReviewScreen />);
     await screen.findByText("Bolt");
-    const field = screen.getByLabelText("Display name");
+    const field = screen.getByLabelText("Name this transaction");
     expect(field.props.value).toBe("Bolt");
     await fireEvent.changeText(field, "Bolt Ride");
     mockGetPendingReviews.mockResolvedValue([]);
@@ -350,6 +374,21 @@ describe("Review screen", () => {
     await waitFor(() =>
       expect(mockConfirmReview).toHaveBeenCalledWith("t1", "transport", undefined, "Bolt Ride"),
     );
+  });
+
+  it("puts the name field above the category chips (Phase 10B, Fix B)", async () => {
+    // The field used to sit below the chips, which pushed it past the fold on
+    // a 375x812 screen for all but the first row.
+    const { toJSON } = await render(<ReviewScreen />);
+    await screen.findByText("Bolt");
+    const order = collectOrder(toJSON(), {
+      name: "review-name-t1",
+      chip: "review-chip-transport",
+    });
+    expect(order).toEqual(["name", "chip"]);
+    // The field's label is action-oriented, not "Display name".
+    expect(screen.getByText("Name this transaction")).toBeTruthy();
+    expect(screen.queryByText("Display name")).toBeNull();
   });
 
   it("selects a row to reveal chips and a details entry", async () => {

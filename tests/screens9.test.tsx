@@ -17,6 +17,7 @@ import {
   getTransactions,
   updateBudget,
   setAvatarUrl,
+  setReviewDisplayName,
 } from "../src/lib/db";
 import {
   pickAvatarImage,
@@ -74,6 +75,7 @@ jest.mock("../src/lib/db", () => ({
   getPendingReviews: jest.fn(),
   getProfile: jest.fn(),
   setAvatarUrl: jest.fn(),
+  setReviewDisplayName: jest.fn(),
   parseMajorToMinor: (raw: string) => {
     const value = Number.parseFloat(raw.replace(/[,₦\s]/g, ""));
     if (!Number.isFinite(value) || value < 0) throw new Error("Enter a valid non-negative amount.");
@@ -107,6 +109,7 @@ const mockGetCategories = getCategories as unknown as MockFn;
 const mockGetCurrentMonthBudget = getCurrentMonthBudget as unknown as MockFn;
 const mockGetProfile = getProfile as unknown as MockFn;
 const mockSetAvatarUrl = setAvatarUrl as unknown as MockFn;
+const mockSetReviewDisplayName = setReviewDisplayName as unknown as MockFn;
 const mockPickAvatarImage = pickAvatarImage as unknown as MockFn;
 const mockUploadAvatarImage = uploadAvatarImage as unknown as MockFn;
 const mockRemoveAvatarObjects = removeAvatarObjects as unknown as MockFn;
@@ -114,6 +117,10 @@ const mockGetTransaction = getTransaction as unknown as MockFn;
 const mockGetTransactions = getTransactions as unknown as MockFn;
 const mockUpdateBudget = updateBudget as unknown as MockFn;
 const M = (fn: unknown): MockFn => fn as unknown as MockFn;
+
+// Screen renders compile many modules on first mount; allow headroom under
+// parallel load so the suite is deterministic on saturated machines.
+jest.setTimeout(20000);
 
 const CATEGORIES = [
   { id: "food", label: "Food" },
@@ -149,8 +156,8 @@ beforeEach(() => {
     mockGetAccounts, mockGetTransactions, mockGetTransaction, mockGetCategories,
     mockGetCurrentMonthBudget, mockCreateBudget, mockUpdateBudget, mockConfirmReview,
     mockExcludeReview, mockAskQuestion, mockGetActiveConnection, mockDisconnect,
-    mockGetProfile, mockSetAvatarUrl, mockPickAvatarImage, mockUploadAvatarImage,
-    mockRemoveAvatarObjects,
+    mockGetProfile, mockSetAvatarUrl, mockSetReviewDisplayName,
+    mockPickAvatarImage, mockUploadAvatarImage, mockRemoveAvatarObjects,
   ]) {
     M(fn).mockReset();
   }
@@ -179,6 +186,7 @@ beforeEach(() => {
   M(mockConfirmReview).mockResolvedValue(undefined);
   M(mockExcludeReview).mockResolvedValue(undefined);
   M(mockDisconnect).mockResolvedValue(undefined);
+  M(mockSetReviewDisplayName).mockResolvedValue(undefined);
 });
 
 describe("Activity screen", () => {
@@ -214,6 +222,43 @@ describe("Activity screen", () => {
     expect(screen.getByTestId("activity-day-Sept 10")).toBeTruthy();
     expect(screen.getByText("Bolt")).toBeTruthy();
     expect(screen.getByText("Shoprite")).toBeTruthy();
+  });
+
+  it("offers rename only on reviewed rows (Phase 10B, Fix C)", async () => {
+    M(mockGetTransactions).mockResolvedValue([
+      txn({
+        id: "t-done",
+        merchant_name: "Bolt",
+        transaction_reviews: [
+          { status: "reconciled", category_id: "transport", user_note: null, display_name: "Airport taxi" },
+        ],
+      }),
+      txn({
+        id: "t-excluded",
+        merchant_name: "Shoprite",
+        transaction_reviews: [
+          { status: "excluded", category_id: "food", user_note: null },
+        ],
+      }),
+      // Still being triaged: renamed on the Review screen, not here.
+      txn({
+        id: "t-pending",
+        merchant_name: "Medplus",
+        transaction_reviews: [
+          { status: "needs_review", category_id: null, user_note: null },
+        ],
+      }),
+    ]);
+    await render(<ActivityScreen />);
+    expect(await screen.findByTestId("activity-row-t-done")).toBeTruthy();
+    // Reconciled and excluded rows get the pencil.
+    expect(screen.getByTestId("activity-rename-t-done")).toBeTruthy();
+    expect(screen.getByTestId("activity-rename-t-excluded")).toBeTruthy();
+    // needs_review rows never do.
+    expect(screen.queryByTestId("activity-rename-t-pending")).toBeNull();
+    // It routes to Detail, where the edit lives.
+    await fireEvent.press(screen.getByTestId("activity-rename-t-done"));
+    expect(mockPush).toHaveBeenCalledWith("/transaction/t-done");
   });
 });
 
@@ -258,6 +303,66 @@ describe("Transaction Detail screen", () => {
       expect(screen.getByText("Bolt Rides")).toBeTruthy();
       // ...while the immutable provider narration is still shown verbatim.
       expect(screen.getByText("Bolt trip ref 123")).toBeTruthy();
+    });
+
+    it("renames from Detail and leaves narration and review state alone (Phase 10B, Fix C)", async () => {
+      M(mockGetTransaction).mockResolvedValue({
+        txn: txn(),
+        review: {
+          status: "excluded",
+          category_id: "transport",
+          user_note: "keep my note",
+          display_name: "Bolt Rides",
+        },
+      });
+      await render(<TransactionDetailScreen />);
+      await screen.findByTestId("detail-rename-open");
+      await fireEvent.press(screen.getByTestId("detail-rename-open"));
+
+      const field = screen.getByLabelText("Name this transaction");
+      expect(field.props.value).toBe("Bolt Rides");
+      await fireEvent.changeText(field, "Airport taxi");
+      await fireEvent.press(screen.getByTestId("detail-rename-save"));
+
+      // Name-only write: no status flip, no category change, no note wipe.
+      await waitFor(() =>
+        expect(mockSetReviewDisplayName).toHaveBeenCalledWith("t1", "Airport taxi"),
+      );
+      expect(mockConfirmReview).not.toHaveBeenCalled();
+      // The raw narration is still on screen and still unedited.
+      expect(screen.getByText("Bolt trip ref 123")).toBeTruthy();
+      expect(screen.queryByTestId("detail-rename-input")).toBeNull();
+    });
+
+    it("cancels a rename without writing anything (Phase 10B, Fix C)", async () => {
+      M(mockGetTransaction).mockResolvedValue({
+        txn: txn(),
+        review: {
+          status: "reconciled",
+          category_id: "transport",
+          user_note: null,
+          display_name: "Bolt Rides",
+        },
+      });
+      await render(<TransactionDetailScreen />);
+      await screen.findByTestId("detail-rename-open");
+      await fireEvent.press(screen.getByTestId("detail-rename-open"));
+      const field = screen.getByLabelText("Name this transaction");
+      await fireEvent.changeText(field, "Discarded");
+      await fireEvent.press(screen.getByTestId("detail-rename-cancel"));
+      expect(mockSetReviewDisplayName).not.toHaveBeenCalled();
+      // Reverted to the previous title.
+      expect(screen.getByText("Bolt Rides")).toBeTruthy();
+    });
+
+    it("offers rename only once a review row exists (Phase 10B, Fix C)", async () => {
+      M(mockGetTransaction).mockResolvedValue({
+        txn: txn({ transaction_reviews: [] }),
+        review: null,
+      });
+      await render(<TransactionDetailScreen />);
+      expect(await screen.findByTestId("detail-merchant")).toBeTruthy();
+      expect(screen.queryByTestId("detail-rename-open")).toBeNull();
     });
   });
 

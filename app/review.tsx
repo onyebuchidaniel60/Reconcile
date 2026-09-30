@@ -1,6 +1,6 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, View } from "react-native";
+import { FlatList, KeyboardAvoidingView, Platform, View } from "react-native";
 import { Pencil } from "lucide-react-native";
 import { useConfirmPulse } from "../src/lib/motion/useConfirmPulse";
 import {
@@ -167,7 +167,16 @@ export default function ReviewScreen() {
       scroll={false}
       testID="review"
     >
-      <View style={{ flex: 1 }}>
+      {/* Phase 10B (Fix B): the rename field opens the soft keyboard right
+        under the tapped row, so the keyboard would otherwise cover it on a
+        short Android screen. `height` is the Android-correct behaviour;
+        iOS uses `padding`. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        testID="review-keyboard-avoid"
+      >
+        <View style={{ flex: 1 }}>
         <FlatList
           data={items}
           keyExtractor={(i) => i.id}
@@ -204,34 +213,41 @@ export default function ReviewScreen() {
                 />
                 {isSelected ? (
                   <View style={{ marginBottom: spacing.md }}>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                      {categories.map((c) => (
-                        <View key={c.id} style={{ margin: spacing.xs }}>
-                          <Chip
-                            label={c.label}
-                            selected={chosen === c.id}
-                            accessibilityLabel={`Set ${c.label}`}
-                            onPress={() =>
-                              setPicked((p) => ({ ...p, [item.transaction_id]: c.id }))
-                            }
-                            testID={`review-chip-${c.id}`}
-                          />
-                        </View>
-                      ))}
-                    </View>
-                    <View style={{ marginTop: spacing.sm }}>
-                      <Input
-                        label="Display name"
-                        tone="dark"
-                        value={names[item.transaction_id] ?? defaultNameFor(item)}
-                        onChangeText={(value) =>
-                          setNames((current) => ({
-                            ...current,
-                            [item.transaction_id]: value,
-                          }))
-                        }
-                        testID={`review-name-${item.transaction_id}`}
-                      />
+                    {/* Phase 10B (Fix B): the name field sits directly under
+                      the row, above the category chips. It used to sit below
+                      the chips, which pushed it past the fold on a 375x812
+                      screen for all but the first row, so the rename was
+                      effectively invisible. Nothing may sit between the row
+                      and this field. */}
+                    <Input
+                      label="Name this transaction"
+                      tone="dark"
+                      labelWeight="600"
+                      value={names[item.transaction_id] ?? defaultNameFor(item)}
+                      onChangeText={(value) =>
+                        setNames((current) => ({
+                          ...current,
+                          [item.transaction_id]: value,
+                        }))
+                      }
+                      testID={`review-name-${item.transaction_id}`}
+                    />
+                    <View style={{ marginTop: spacing.md }}>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                        {categories.map((c) => (
+                          <View key={c.id} style={{ margin: spacing.xs }}>
+                            <Chip
+                              label={c.label}
+                              selected={chosen === c.id}
+                              accessibilityLabel={`Set ${c.label}`}
+                              onPress={() =>
+                                setPicked((p) => ({ ...p, [item.transaction_id]: c.id }))
+                              }
+                              testID={`review-chip-${c.id}`}
+                            />
+                          </View>
+                        ))}
+                      </View>
                     </View>
                     <Link
                       href={`/transaction/${t.id}`}
@@ -249,16 +265,17 @@ export default function ReviewScreen() {
           }}
         />
         <View style={{ paddingTop: spacing.md }}>
-          <Button
-            title={busy ? "Confirming..." : "Confirm"}
-            onPress={confirm}
-            disabled={busy}
-            loading={busy}
-            accessibilityLabel={`Confirm ${selected ? (selected.transaction.merchant_name ?? "transaction") : "transaction"}`}
-            testID="review-confirm"
-          />
+            <Button
+              title={busy ? "Confirming..." : "Confirm"}
+              onPress={confirm}
+              disabled={busy}
+              loading={busy}
+              accessibilityLabel={`Confirm ${selected ? (selected.transaction.merchant_name ?? "transaction") : "transaction"}`}
+              testID="review-confirm"
+            />
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </DarkScreenScaffold>
   );
 }

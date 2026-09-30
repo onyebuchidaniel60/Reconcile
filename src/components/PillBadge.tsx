@@ -9,6 +9,8 @@ export type PillBadgeVariant = "dark" | "light";
 interface PillBadgeProps {
   label: string;
   variant?: PillBadgeVariant;
+  /** Overrides the default label weight (e.g. "700" on a percentage pill). */
+  weight?: "400" | "500" | "600" | "700";
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -20,6 +22,7 @@ interface PillBadgeProps {
 export function PillBadge({
   label,
   variant = "dark",
+  weight,
   testID,
   style,
 }: PillBadgeProps) {
@@ -37,7 +40,7 @@ export function PillBadge({
         style,
       ]}
     >
-      <Text role="small" color={variant === "dark" ? "paper" : "ink"}>
+      <Text role="small" color={variant === "dark" ? "paper" : "ink"} style={weight ? { fontWeight: weight } : undefined}>
         {label}
       </Text>
     </View>

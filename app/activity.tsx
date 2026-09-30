@@ -2,14 +2,17 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Pencil } from "lucide-react-native";
 import { Chip } from "../src/components/Chip";
 import { EmptyState } from "../src/components/EmptyState";
 import { ErrorState } from "../src/components/ErrorState";
+import { IconButton } from "../src/components/IconButton";
 import { LoadingState } from "../src/components/LoadingState";
 import { PillNav, pillNavClearance } from "../src/components/PillNav";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { Text } from "../src/components/Text";
 import { TransactionRow } from "../src/components/TransactionRow";
+import { select } from "../src/lib/haptics";
 import {
   getAccounts,
   getCategories,
@@ -24,6 +27,7 @@ import {
   formatRowDate,
   resolveDisplayName,
 } from "../src/lib/txn";
+import { colors } from "../src/theme/colors";
 import { spacing } from "../src/theme/spacing";
 
 type Filter = { kind: "all" } | { kind: "new" } | { kind: "category"; id: string } | { kind: "account"; id: string };
@@ -39,6 +43,16 @@ function filterKey(filter: Filter): string {
   if (filter.kind === "all") return "all";
   if (filter.kind === "new") return "new";
   return `${filter.kind}:${filter.id}`;
+}
+
+/**
+ * Phase 10B (Fix C): a row is renameable once its review exists and is
+ * settled. `needs_review` is excluded on purpose — those are still being
+ * triaged on the Review screen, which is where the name is set.
+ */
+function isReviewed(txn: Transaction): boolean {
+  const status = txn.transaction_reviews?.[0]?.status;
+  return status === "reconciled" || status === "excluded";
 }
 
 export default function ActivityScreen() {
@@ -219,19 +233,51 @@ export default function ActivityScreen() {
                     {item.header}
                   </Text>
                 ) : (
-                  <TransactionRow
-                    merchant={resolveDisplayName(
-                      item.row!.transaction_reviews?.[0],
-                      item.row!,
-                    )}
-                    date={formatRowDate(item.row!.occurred_at)}
-                    amount={item.row!.amount_minor}
-                    currency={item.row!.currency}
-                    category={categoryTintFor(item.row!, categories)}
-                    direction={directionFor(item.row!)}
-                    onPress={() => router.push(`/transaction/${item.row!.id}`)}
-                    testID={`activity-row-${item.row!.id}`}
-                  />
+                  // Phase 10B (Fix C): the chosen entry point is a trailing
+                  // pencil, not a long-press sheet. Long-press is undiscoverable
+                  // and has no affordance on Android, and a sheet needs a modal
+                  // primitive this phase is not allowed to add. The pencil is
+                  // shown only for rows whose review already exists
+                  // (reconciled/excluded) — `needs_review` rows are renamed
+                  // from Review. It navigates to Detail, where the edit lives.
+                  <View
+                    style={{ flexDirection: "row", alignItems: "center" }}
+                    testID={`activity-item-${item.row!.id}`}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <TransactionRow
+                        merchant={resolveDisplayName(
+                          item.row!.transaction_reviews?.[0],
+                          item.row!,
+                        )}
+                        date={formatRowDate(item.row!.occurred_at)}
+                        amount={item.row!.amount_minor}
+                        currency={item.row!.currency}
+                        category={categoryTintFor(item.row!, categories)}
+                        direction={directionFor(item.row!)}
+                        onPress={() => router.push(`/transaction/${item.row!.id}`)}
+                        testID={`activity-row-${item.row!.id}`}
+                      />
+                    </View>
+                    {isReviewed(item.row!) ? (
+                      <View style={{ marginLeft: spacing.xs }}>
+                        <IconButton
+                          accessibilityLabel={`Rename ${resolveDisplayName(
+                            item.row!.transaction_reviews?.[0],
+                            item.row!,
+                          )}`}
+                          onPress={() => {
+                            void select();
+                            router.push(`/transaction/${item.row!.id}`);
+                          }}
+                          tone="light"
+                          testID={`activity-rename-${item.row!.id}`}
+                        >
+                          <Pencil size={20} color={colors.ink} strokeWidth={1.5} />
+                        </IconButton>
+                      </View>
+                    ) : null}
+                  </View>
                 )
               }
             />

@@ -277,6 +277,27 @@ export async function confirmReview(
 }
 
 /**
+ * Writes ONLY the user's display name (Phase 10B, Fix C).
+ *
+ * Deliberately not routed through `confirmReview`: that helper also sets
+ * `status`, `category_id`, `user_note`, `confirmed_at`, `source`, and learns
+ * a merchant rule. Renaming a transaction must not flip an `excluded`
+ * review back to `reconciled`, wipe the user's note, or pollute the learned
+ * rules — so this touches the single user-owned display column and nothing
+ * else. Provider facts are never involved.
+ */
+export async function setReviewDisplayName(
+  transactionId: string,
+  displayName: string,
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("transaction_reviews")
+    .update({ display_name: displayName })
+    .eq("transaction_id", transactionId);
+  if (error) throw new Error(friendly(error, "Could not save the name."));
+}
+
+/**
  * Learned merchant rules: when the same merchant/category pair has been
  * confirmed twice (including this one), store a merchant_rules row so
  * future matches auto-suggest that category. Best-effort: failures here
