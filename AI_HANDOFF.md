@@ -1,8 +1,222 @@
 # Reconcile — AI Handoff
 
-## Current status
-**PHASE 1 COMPLETE.** Mobile foundation committed as
-`feat: bootstrap reconcile mobile foundation`. No domain logic exists.
+## Current state
+
+**Project:** Reconcile. Nigeria-first mobile personal-finance app for
+cross-bank transaction reconciliation, budgeting, and read-only financial
+insights. Repo: `github.com/onyebuchidaniel60/Reconcile`.
+
+**Current phase:** Phase 10B close — pending operator re-verification.
+
+| Fact | Value |
+|---|---|
+| Last verified APK (operator is installing this) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` |
+| Live web alias | `https://reconcile-uhhh2.vercel.app` |
+| Last phase commit (Phase 10B.5) | `53d4c0e fix: unify home and budget month spend; wire home month selector (Phase 10B.5)` |
+| Handoff commit (this file) | `HEAD` — see the note below |
+| `demo-v1` tag | `991851b` (unchanged since the demo phase closed) |
+| Source-of-truth doc index | "Source-of-truth document index", immediately below |
+| Environment / credentials | "Environment state", immediately below |
+
+> The "Handoff commit" row reads `HEAD` because the hash of the commit that
+> introduces it cannot be known before it exists. The real hash is recorded
+> one commit later, in a docs-only follow-up that replaces this row.
+
+**What the next session does.** Read this file top to bottom. Confirm state
+with `git fetch origin && git status` (tree should be clean, HEAD should be
+the handoff commit). Then, only after the operator confirms the Phase 10B.5
+APK above on a real device, run **Phase 10B close** — the
+`SKILL_FRONTEND_DESIGN.md` v1 rewrite scoped and seeded in "Phase 10B close —
+scope and lessons to encode" below. Do not start Phase 11.
+
+Everything below this block is per-phase history, newest checkpoint at the
+bottom of that run of entries. Historical sections are preserved verbatim as
+evidence; several contain superseded facts (older Vercel aliases, earlier
+"next task" lines). Where history contradicts the block above, **the block
+above wins**.
+
+## Source-of-truth document index
+
+Every document a session may need, and what each one governs:
+
+- `PROJECT_SPEC.md` — product definition and MVP scope.
+- `ARCHITECTURE.md` — system shape, technology choices, security model.
+- `IMPLEMENTATION_PLAN.md` — phase sequence (v3, frontend-first with native
+  verification).
+- `AGENTS.md` — operating rules for the coding agent.
+- `RECONCILE_BLUEPRINT.md` — consolidated master blueprint.
+- `core-overview.md` — core demo definition; the foundation the full build
+  extends. Explicitly does not override the docs above.
+- `SKILL_LEAN_DELIVERY.md` — delivery sequencing, deployment, agent-as-user
+  verification.
+- `design.md` — visual and interaction source of truth. Wins on visual
+  conflicts.
+- `frontend-implementation-plan.md` — frontend build order.
+- `SKILL_FRONTEND_DESIGN.md` — the skill earned at Phase 10B close
+  (currently a blueprint placeholder, not yet rewritten; §10 evolution log
+  still empty).
+- `AI_HANDOFF.md` — this file. Current state and per-phase checkpoints.
+
+## Environment state
+
+**`.env.local`** — gitignored (`.gitignore:49`, pattern `.env*.local`), never
+committed. Holds:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only
+- `SUPABASE_PROJECT_REF`
+- `SUPABASE_ACCESS_TOKEN`
+- `VERCEL_TOKEN`
+- `VERCEL_OIDC_TOKEN`
+- `EXPO_TOKEN` — not present in this repo's `.env.local`; EAS auth is via the
+  logged-in CLI session (`buchi208`). Set one if a non-interactive flow needs
+  it.
+
+**`.env.production`** — committed. Contains `EXPO_PUBLIC_*` values only. Never
+add a server-only value here; the web bundle inlines this file's contents.
+
+**Browser tooling** — Playwright 1.63.0 + headless Chromium, self-provisioned
+each session (no MCP or computer-use tool exists in this environment).
+Verified working in the Phase 10B.5 session at Chromium 153.0.8010.12.
+
+**Native tooling** — EAS CLI 24.8.0, logged in as `buchi208`. `eas.json` and
+`app.json` are configured for `com.onyebuchidaniel.reconcile`. Builds are
+submitted with `EAS_SKIP_AUTO_FINGERPRINT=1` (local fingerprint computation
+stalls on this machine).
+
+**Live web alias** — `https://reconcile-uhhh2.vercel.app`.
+Do **not** use `reconcile-jhmath5cq-uhhh2.vercel.app` — it is stale and still
+serves an old bundle. `reconcile-two-tau.vercel.app` also still resolves and
+tracks current deploys.
+
+## Phase 10B close — scope and lessons to encode
+
+### Part 1 — What Phase 10B close does
+
+Phase 10B close rewrites `SKILL_FRONTEND_DESIGN.md` v1 from the evidence
+Phases 3–10 actually accumulated. The file currently exists (from blueprint
+commit `38be36f`) but is unchanged since then — its §10 evolution log is
+empty. The close is the moment the skill is earned: it replaces the
+placeholder with a v1 that encodes the distilled rules below.
+`SKILL_FRONTEND_DESIGN.md` is not touched until the operator has verified the
+Phase 10B.5 APK on device, and the close runs in a fresh session.
+
+### Part 2 — Ten lessons to encode
+
+1. **Shared calculation ≠ shared definition.** Home and Budget called the same
+   engine helper and still disagreed — one read `.expenseMinor` (gross), the
+   other read `.netMinor` (net of refunds). Unifying a computation means
+   unifying the definition, not just the call site.
+2. **Date windows drift silently.** A local calendar month and a `Date.parse`
+   UTC midnight look identical in code and differ by an hour near month
+   boundaries. Pin date arithmetic to one convention across the codebase.
+3. **Yoga `flexShrink: 0` on Android vs CSS `flexShrink: 1` on web.** Same
+   component, same code, native overflows at 375px, web does not. Native
+   overflow must be verified on device or in a native-width proxy, not
+   inferred from a web pass.
+4. **"Below the fold at 812px" is a measurable defect class that unit tests
+   cannot catch.** Any field that must be visible on a specific viewport must
+   be asserted with a measured position, not a snapshot.
+5. **Percentage pills over a fluid bar need their anchor zone floored.** A
+   percentage pill centred over a fill ratio of 1% cannot be rendered without
+   a minimum anchor zone. Any fixed-width assumption breaks at small ratios.
+6. **A rename must not route through a helper that also mutates status.** The
+   Detail rename uses `setReviewDisplayName`, not `confirmReview`, because
+   `confirmReview` also flips status, wipes `user_note`, and pollutes learned
+   merchant rules. Side effects hide in reused code — read the callee before
+   reusing it.
+7. **Expo web header chrome is platform-only.** `headerShown: false` on a
+   Stack route removes a visual element on web that is OS-handled on native.
+   Header behaviour must be verified on both surfaces independently.
+8. **`KeyboardAvoidingView` needs `behavior="height"` on Android,
+   `behavior="padding"` on iOS.** A single value does not work on both.
+9. **Design-mandated contrast violations are flagged, not fixed.** The
+   white-on-alert-red 12px starburst callout measures ~3.6:1 against AA's
+   4.5:1 minimum. It is mandated by `design.md` §3 and §7. Changing it requires
+   a `design.md` decision, not a code patch.
+10. **Every chart worklet that calls a non-worklet function crashes on native
+    and works on web.** The fastest diagnostic is the Expo dev client: install
+    it, reproduce, read the red error overlay. Guessing through EAS build
+    cycles without the dev client is slower and less certain.
+
+### Part 3 — Method lessons
+
+- Two-screen side-by-side reading (Home vs Budget, same period, same fixture)
+  catches definition mismatches that per-screen tests never see.
+- Reading two screens' numbers as a user does — not asserting on each screen
+  in isolation — is what caught the Home/Budget expense mismatch in Phase
+  10B.5.
+- A shared helper is not evidence of a shared definition. Read the fields it
+  returns, not just its name.
+
+### Part 4 — Source for each lesson
+
+| Lesson | Originating record in this file |
+|---|---|
+| 1. Shared calculation ≠ shared definition | Phase 10B.5 Fix A (the Home-vs-Budget definition table) |
+| 2. Date windows drift silently | Phase 10B.5 Fix A (`monthBounds` vs `Date.parse`) |
+| 3. Yoga `flexShrink` | Phase 10A.5 Fix 3 |
+| 4. Below the fold at 812px | Phase 10B Fix B (measured y=912 vs 812) |
+| 5. Pill anchor zone floored | Phase 10B Fix A (`PILL_EDGE_ANCHOR_RATIO`) |
+| 6. Rename helper side effects | Phase 10B Fix C (`setReviewDisplayName`) |
+| 7. Web header chrome | Phase 10A.5 Fix 1 and the Phase 10A deferred list |
+| 8. `KeyboardAvoidingView` | Phase 10B Fix B |
+| 9. 3.6:1 starburst residual | Phase 10A KNOWN RESIDUAL |
+| 10. Worklet/non-worklet crash | Phase 8 native crash + "Native crash resolved" |
+
+## Phase 11 — Mono integration (next after Phase 10B close)
+
+- Replaces the demo provider with the real Mono adapter, behind the
+  **unchanged** `FinancialProvider` interface. Do not change the interface.
+- Mono client lives in Supabase Edge Functions only — never in the client.
+- `MONO_SECRET_KEY` is set as a **Supabase Edge Function secret**. Never in
+  `.env.local`, never in `.env.production`, never in the client bundle.
+- **Institution discovery:** dynamic from Mono, not hard-coded.
+- **Connection session:** server-side creation; client opens Mono Connect UI.
+- **Account persistence:** normalized per the existing schema
+  (`bank_connections`, `bank_accounts`).
+- **Webhook:** authenticity verification (Mono signature) + idempotency via a
+  unique provider event key. **Note:** no `provider_events` table exists yet —
+  the current migrations (`000001`–`000004`) create `sync_runs` for sync
+  bookkeeping but nothing for webhook events. Phase 11 must add that table
+  (and its RLS) as part of the phase.
+- **Reauth handling:** Mono reports `reauth_required`; connection status
+  updates and the user is prompted to reconnect.
+- **Verification:** a live sandbox test proving the full loop (connect →
+  sync → review → categorize → budget updates) against Mono sandbox, on both
+  web and native.
+- **Real-world dependency:** Mono business onboarding/KYB and sandbox keys must
+  be available before this phase can complete. If they are not, implement the
+  adapter and test against a mock, and explicitly flag live verification as
+  pending.
+- Commit: `feat: add mono financial data provider (Phase 11)`.
+
+## Open flags carried into Phase 10B close
+
+- **APK hash stamp.** The Phase 10B.5 build's `gitCommitHash` and
+  `gitCommitMessage` came back empty from the EAS API (submit ran from a
+  background job without git context, with `EAS_NO_VCS` set). The archive is
+  still the correct code — build started 15:53, commit `53d4c0e` landed 15:39,
+  `git diff 53d4c0e..HEAD` empty — so it is trustworthy by tree equality, not
+  by a stamped hash. Re-run the build in the foreground if a stamped artifact
+  is wanted.
+- **Budget Overview card hides on prior months by design** (Phase 10B.5 Fix B).
+  Budgets are per-calendar-month rows and only the current month's is fetched,
+  so showing it would compare the selected month's spend against the current
+  month's limit. Confirm the operator accepts this.
+- **Stale URL.** `reconcile-jhmath5cq-uhhh2.vercel.app` is stale. Use
+  `https://reconcile-uhhh2.vercel.app`.
+- **Phase 10B.5 seed timing.** Early in a calendar month the current month
+  holds very few demo rows (1–4), so a prior month can look fuller. Existing
+  seed shape, not a regression.
+- **Known deferred from Phase 10A:** hero legend wrap at 375; Ask Reconcile
+  yellow entry tint; Budget Ask entry; white-on-alert-red 12px callout
+  contrast.
+
+---
+
+## Per-phase checkpoints (history)
 
 ## Phase 1 checkpoint (evidence)
 - Expo 57 + React Native + TypeScript shell with Expo Router
@@ -1279,22 +1493,29 @@ Use:
 `IMPLEMENT → TEST → INSPECT → FIX → COMMIT → CHECKPOINT → STOP`
 
 ## Current phase
-Phase 1 — Mobile foundation and tooling complete and committed.
+**Phase 10B close — pending operator re-verification.** Phases 3–10B.5 are
+implemented, tested, and committed; the Phase 10B.5 APK is with the operator.
+
+This section was previously "Current phase: Phase 1". That was stale and
+superseded — see "Current state" at the top of this file, which is
+authoritative.
 
 ## Next exact task
-Implement **Phase 2 — Design system and app shell** from `IMPLEMENTATION_PLAN.md` only.
+The operator verifies the Phase 10B.5 APK
+(`https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk`)
+on a real Android device. Once they confirm, **Phase 10B close** rewrites
+`SKILL_FRONTEND_DESIGN.md` v1 from accumulated evidence — scoped and seeded in
+"Phase 10B close — scope and lessons to encode" above. The skill stays
+untouched until that verification completes.
 
-Before changing code:
-1. inspect repository state;
-2. read source-of-truth docs;
-3. confirm no later phase is already implemented.
+**After Phase 10B close:** Phase 11 — Mono integration (see the brief above
+and `IMPLEMENTATION_PLAN.md` §Phase 11).
 
-After Phase 1:
-- run tests;
-- inspect diff;
-- update this handoff;
-- commit;
-- STOP.
+Before changing code in any phase:
+1. inspect repository state (`git fetch origin && git status`);
+2. read the source-of-truth docs listed in the index at the top of this file;
+3. confirm no later phase is already implemented;
+4. confirm this file's "Current state" block agrees with `git log`.
 
 ## Phase 3 checkpoint (design tokens)
 - Commit: `3120a3c feat: add design token system (Phase 3)`, plus
