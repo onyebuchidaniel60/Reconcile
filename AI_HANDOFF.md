@@ -886,6 +886,173 @@
 - SKILL_FRONTEND_DESIGN.md still untouched (§10 evolution log still the
   template). Phase 10B and Phase 11 NOT started.
 
+## Phase 10B checkpoint (home budget redesign + post-review renaming)
+- Fix commit: `83d033a feat: redesign home budget overview, add post-review
+  transaction renaming (Phase 10B)` (12 files, +731/-123). Second commit
+  (this entry): handoff plus 22 evidence screenshots.
+- Scope: the three operator-reported defects from the Phase 10A.5 APK native
+  walk. No new primitives (one `size` prop on `ProgressBar`, plus `weight`
+  on `PillBadge` and `labelWeight` on `Input`), no new organisms, no
+  `supabase/` change (the `display_name` column already existed from
+  migration 000004), no UI framework.
+
+### Fix A — Home budget overview redesign. IMPLEMENTED, VERIFIED.
+- Read `design/reference-1.webp` first. The reference's Budget Overview bar
+  is: filled portion left carrying the percentage, hatched remainder right,
+  date range below. The shipped card had a 12px bar whose pill floated over
+  the whole track with no remainder treatment, which is why the operator
+  read it as confusing.
+- `ProgressBar` gained `size: "default" | "large"` and a `hatched` flag.
+  `large` is 28px tall on a `paper`-at-60% track with the unfilled
+  remainder carrying the existing `HatchPattern` in `line` at 40%. The
+  percentage pill is layered *outside* the clipped track so a narrow fill
+  cannot hide it: at >=15% fill it centres over the fill, below that it is
+  right-anchored to the fill edge, and the anchor zone is floored at 15% so
+  the pill is never clipped. The 15% is a ratio constant, not a px value —
+  the bar is fluid. The uncapped percent + alert-red over-budget fill from
+  Phase 10A.5 Fix 6 are unchanged and still live.
+- `BudgetOverviewCard` now renders Spent (left) and Left (right) rows with
+  tabular amounts under the bar. Over budget the right label becomes "Over"
+  and shows the overdraft in alert red. The date range is kept below them;
+  removing it was allowed but both rows and the range read clearly together,
+  so all three stayed.
+- design.md §8 Home updated (the one authorized edit): the bar, the hatched
+  remainder, and the Spent/Left rows are now specified. No other design.md
+  change; `git diff design.md` = 10 lines, all inside §8 Home.
+- Web proof on the deployed bundle, both viewports, bar height measured 28px:
+  - under budget (24%): pill "24%", hatch present and inside the bar,
+    `Spent ₦218,702.96` / `Left ₦681,297.04`, zone 24% centred.
+  - narrow fill (1%): pill "1%" still fully visible, zone floored to 15%
+    and `flex-end` anchored — the edge-anchor rule proven live.
+  - over budget (109%): pill "109%", full alert-red fill, right row reads
+    `Over ₦18,702.96`. The hatch is correctly absent because the fill caps
+    at 100%.
+  - Screenshots `phase10b-home-budget-{under,narrow}-*`, `phase10b-home-full-*`.
+- New tests: under-budget split row, exactly-at-limit ("100%", ink not red),
+  over-budget "Over" + alert red, tiny-fill pill visibility + anchor, and
+  wide-fill centring (5 cases in `tests/wave8.test.tsx`).
+
+### Fix B — review name edit usability. INVESTIGATED, ROOT-CAUSED, FIXED.
+- Root cause found by measurement, not assumption: the field rendered fine
+  and Confirm saved correctly (a seeded row persisted as
+  "Medplus Pharmacy RENAMED"), but at 375x812 the field sat *below the fold*
+  for every row except the first — measured field bottom at y=912 against
+  an 812px viewport on row 52 of 53. The chips above it pushed it down. It
+  was a discoverability bug, not a save bug.
+- Fixes: the field now sits directly under the tapped row, above the chips,
+  with nothing between them; the label is "Name this transaction" at
+  `small`/600 in paper (was the generic "Display name"); the screen is
+  wrapped in `KeyboardAvoidingView` (`height` on Android, `padding` on iOS)
+  so the keyboard cannot cover the field it just opened.
+- Web proof at both viewports: field visible without scrolling on rows 0,
+  mid-list, and last (bottoms 324 / 518 / 776 against 812), always above the
+  chips, `review-keyboard-avoid` present, and a typed name persisted to
+  `transaction_reviews.display_name`.
+- Test: `collectOrder` walks the rendered tree and asserts
+  `["name", "chip"]` document order, plus the new label text.
+
+### Fix C — post-review renaming from Activity and Detail. IMPLEMENTED, VERIFIED.
+- Detail: a 44x44 pencil `IconButton` beside the title opens an inline edit
+  prefilled with the current display name, with Cancel/Save. Offered only
+  when a review row exists (there is nothing to write `display_name` on
+  before the first review).
+- `setReviewDisplayName` writes the display column and NOTHING else.
+  Deliberately not routed through `confirmReview`, which also sets
+  `status`, `category_id`, `user_note`, `confirmed_at`, `source` and learns
+  a merchant rule — renaming must not flip an `excluded` review back to
+  `reconciled`, wipe the user's note, or pollute learned rules. Tested
+  explicitly.
+- Activity: **pencil chosen over long-press.** Long-press has no affordance
+  on Android and an action sheet needs a modal primitive this phase may not
+  add. The pencil shows only on rows whose review is `reconciled` or
+  `excluded`, never on `needs_review` (those are renamed from Review), and
+  routes to Detail where the edit lives. Both approaches were not built.
+  Home rows deliberately have no affordance; the row opens Detail.
+- Propagation proof: took a row Home was actually rendering (located by its
+  `home-row-<id>` testID), renamed it via Detail, reloaded Home and read
+  that same row back — `Medplus Pharmacy` became `Coffee with Ada` on Home
+  and on Activity, while Detail's narration row still read
+  `Medplus Pharmacy ref 178991`. A first propagation attempt reported
+  `false`; that was a measurement artifact (the transaction sat outside
+  Home's 5-row window), not a defect — re-tested against a row known to be
+  in the window and it passes.
+- New tests: rename writes only the name and never calls `confirmReview`,
+  cancel writes nothing, pencil hidden with no review, pencil present on
+  reconciled/excluded and absent on needs_review, and it routes to Detail.
+
+### Checks on the fix tree
+- `npx tsc --noEmit` → 0. `npx eslint .` → 0 (10 `import/first` warnings
+  introduced by an intermediate edit were fixed, not suppressed).
+- `npm test` → 20 suites passed, 1 skipped (live); 193 passed, 2
+  live-skipped; `check:tokens` 0 violations; `native-safety` green.
+- `npx expo export -p web` → success, 20 static routes.
+- One flaky-test fix: `tests/screens9.test.tsx` gained the same
+  `jest.setTimeout(20000)` headroom the other screen suites already carry.
+  The failure was a 20s timeout under parallel load on a saturated machine,
+  reproduced only in full-suite runs; the suite passes standalone and in
+  full-suite runs since.
+
+### Deploy and web regression
+- Pushed `83d033a`; Vercel READY (`reconcile-o6y4qi8zf-uhhh2.vercel.app`).
+  `curl -sIL https://reconcile-uhhh2.vercel.app` → 200; all three aliases
+  point at `dpl_5B7uEFaSmDKtsGPtsxCUrxk14sMG`. **The Phase 10A alias
+  `reconcile-jhmath5cq-uhhh2.vercel.app` still serves a stale bundle — live
+  alias remains `reconcile-uhhh2.vercel.app`.**
+- Deployed bundle carries the new markers (`Name this transaction`,
+  `detail-rename-open`, `activity-rename`) and still carries the Phase 10A
+  markers (`Edit budget`, `Change photo`, `budget-scroll`) — no regression.
+  Exactly one Supabase-URL match; the single `sb_secret_` hit is supabase-js's
+  prefix-check function body, not a value. No secret in the bundle.
+- Agent-as-user web pass (Playwright, headless Chromium, throwaway users via
+  the Supabase admin API, reduced motion on) at **375×812 and 1280×800**:
+  sign-in → demo sync → budget create → review confirm with a typed name →
+  Activity → Detail rename → Home → Insights → Budget → Settings.
+  Zero console errors. Zero 4xx/5xx. Zero overflowing elements, zero
+  unlabeled icon buttons, zero sub-44px targets.
+  Two findings, both handled:
+  - The Activity filter row is a deliberate horizontal scroller
+    (design.md §8 Activity), so its chips legitimately extend past the
+    viewport. The audit now excludes `[data-testid="activity-filters"]`
+    rather than reporting it as overflow; with that exclusion, overflow is
+    empty. This is a measurement correction, not a UI change.
+  - The only network entries are `net::ERR_ABORTED` on a
+    `transaction_reviews` count — the screen-change abort of an in-flight
+    request, present in every prior phase too.
+- 10A/10A.5 regression checks still green in the same pass: Budget has no
+  horizontal overflow, Settings still computes a `76px` pill clearance
+  (0 inset + 60 pill + 16), Insights top merchant still renders.
+- Screenshots: `docs/browser-tools/phase10b-*.png` (22 files).
+
+### Preview APK
+- EAS build (NOT a dev client) from `83d033a`, profile `preview`, SDK 57,
+  `com.onyebuchidaniel.reconcile`, FINISHED, `gitCommitHash 83d033a`,
+  message `feat: redesign home budget overview, add post-review transaction
+  renaming (Phase 10B)`. Submitted with `EAS_SKIP_AUTO_FINGERPRINT=1`;
+  credentials and profile unchanged.
+- Build:
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/2ca3be94-31f0-42df-b2d5-a8a88e47bb8c`
+- APK:
+  `https://expo.dev/artifacts/eas/pJh4Ps1y8jdib5PhrgE32MKAImvEArrqcuArpXwXwRo.apk`
+  (verified reachable, HTTP 200, 110,397,173 bytes)
+
+### Needs a real device
+- **Fix A** — the tall bar, the hatch rendering, and the Spent/Left rows are
+  verified in a browser at both viewports; confirm the 28px bar and hatch
+  read correctly at native density on the device.
+- **Fix B** — the fold problem is fixed and measured in a browser; the
+  keyboard-avoidance behaviour can only be judged with a real soft keyboard.
+  Confirm the field is reachable and not covered on Android.
+- **Fix C** — both entry points work in a browser; confirm the Activity
+  pencil's 44x44 target is comfortable in a thumb reach on the device, and
+  that long-press on a row (now inert) does not feel like a missing feature.
+
+- Explicit statement: "Phase 10B close pending operator re-verification at
+  `https://expo.dev/artifacts/eas/pJh4Ps1y8jdib5PhrgE32MKAImvEArrqcuArpXwXwRo.apk`.
+  SKILL_FRONTEND_DESIGN.md rewrite remains gated on that verification and
+  runs in Phase 10B close."
+- SKILL_FRONTEND_DESIGN.md still untouched (§10 evolution log still the
+  template). Phase 10B close NOT started; Phase 11 NOT started.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
