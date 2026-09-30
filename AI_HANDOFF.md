@@ -13,14 +13,15 @@ insights. Repo: `github.com/onyebuchidaniel60/Reconcile`.
 | Last verified APK (operator is installing this) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` |
 | Live web alias | `https://reconcile-uhhh2.vercel.app` |
 | Last phase commit (Phase 10B.5) | `53d4c0e fix: unify home and budget month spend; wire home month selector (Phase 10B.5)` |
-| Handoff commit (this file) | `HEAD` — see the note below |
+| Handoff commit (this file) | `dc010ce` — `docs: remediation of AI_HANDOFF.md for session continuity` |
 | `demo-v1` tag | `991851b` (unchanged since the demo phase closed) |
 | Source-of-truth doc index | "Source-of-truth document index", immediately below |
 | Environment / credentials | "Environment state", immediately below |
 
-> The "Handoff commit" row reads `HEAD` because the hash of the commit that
-> introduces it cannot be known before it exists. The real hash is recorded
-> one commit later, in a docs-only follow-up that replaces this row.
+> The "Handoff commit" row names `dc010ce`, the commit that introduced this
+> block. The commit that replaced the `HEAD` placeholder with that hash is
+> `docs: fix handoff commit hash reference` — a docs-only follow-up. To find
+> the most recent update to this file: `git log -n 1 -- AI_HANDOFF.md`.
 
 **What the next session does.** Read this file top to bottom. Confirm state
 with `git fetch origin && git status` (tree should be clean, HEAD should be
