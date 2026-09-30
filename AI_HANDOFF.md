@@ -704,6 +704,188 @@
   template) — the Phase 10B rewrite is gated on the operator's native pass
   completing cleanly. No source-of-truth doc changed except this handoff.
 
+## Phase 10A.5 checkpoint (native-walk defect fixes)
+- Fix commit: `5e64d16 fix: native walk defects — home chrome, nav icons,
+  overflow, profile photo, over-budget, review display name` (32 files,
+  +857/-64). Second commit (this entry): handoff only.
+- Scope: the seven operator-reported defects from the Phase 10A APK native
+  walk. No redesign, no new primitives or organisms, no source-of-truth doc
+  changed except the two design.md lines authorized by Fix 6.
+
+### Per-fix status
+- **Fix 1 — Home top bar is ink, not white. IMPLEMENTED, VERIFIED.**
+  `headerShown: false` on the `home` and `review` Stack routes. Grep confirms
+  no other routed screen uses `DarkScreenScaffold` (`app/dev/primitives.tsx`
+  does but is not a Stack route). Web proof: no `header`/`nav` element in the
+  Home DOM, and the top-of-viewport background samples `rgb(10, 10, 10)`
+  (Ink). Screenshot `phase10a5-home-375.png`.
+- **Fix 2 — Home top-right icons non-functional. IMPLEMENTED, VERIFIED.**
+  Grid → `/insights`, card → `/budget`, each with `accessibilityLabel` and a
+  `select()` haptic. Duplicate-PillNav shortcut is intentional per operator.
+  Web proof: labels read `Insights` / `Budget` and pressing the grid icon
+  navigates to Insights.
+- **Fix 3 — Budget horizontal overflow on native. IMPLEMENTED (device-pending).**
+  Root cause was Android Yoga's default `flexShrink: 0` on flex-row children,
+  which is exactly why web at 375px was clean (CSS flexbox defaults to 1).
+  Fixed at all three named sites: the category-cap row in `app/budget.tsx`,
+  the `LineChart` x-axis label row, and both the `BarChart` y-gutter and its
+  x-axis label row — each with `flexShrink: 1` plus `numberOfLines={1}` so
+  labels ellipsize rather than clip. No fixed widths anywhere.
+  **ExpensesBarCard's starburst callout was investigated and CLEARED**: the
+  callout is a fixed 48px box inside an `alignItems: "center"` wrapper with
+  no width of its own, so it cannot exceed the card's content width, and its
+  text is the compact form fixed in Phase 10A. The overflow was the
+  non-shrinking siblings, not the callout. Recorded as a code comment in
+  `ExpensesBarCard.tsx`; not refactored.
+  Web proof: 0 overflowing elements on every audited screen at both viewports.
+  The *native* absence of overflow is still device-only.
+- **Fix 4 — sign-out row below the visible area. IMPLEMENTED (device-pending).**
+  Settings, Budget and Insights content moved into scroll containers
+  (`settings-scroll`, `budget-scroll`, `insights-scroll`); Activity uses its
+  FlatList `contentContainerStyle`. The bottom padding is now derived, not
+  guessed: `pillNavClearance(insets.bottom)` = safe-area bottom inset +
+  `PILL_NAV_HEIGHT` + `spacing.lg`, where `PILL_NAV_HEIGHT` (44 + spacing.sm*2
+  = 60) is exported from `src/components/PillNav.tsx` and is also the pill's
+  own `minHeight`, so the reserved value and the rendered value cannot drift.
+  `useSafeAreaInsets()` from `react-native-safe-area-context` supplies the
+  inset. Web proof: computed `padding-bottom: 76px` (0 inset + 60 + 16) on
+  Budget, and the container genuinely scrolls.
+  **FLAG for device:** on these four screens `PillNav` sits in normal flow
+  rather than overlaying, so the reserved clearance is additive to the 48px
+  `ScreenScaffold` already applies. The result is generous bottom whitespace,
+  not overlap. Confirm the gap is not excessive on a real device.
+- **Fix 5 — profile picture. IMPLEMENTED, VERIFIED END TO END.**
+  Migration `000003_profile_avatar.sql`: nullable `users.avatar_url`, the
+  public `avatars` bucket, and four storage policies (public SELECT on the
+  bucket; INSERT/UPDATE/DELETE gated on
+  `auth.uid()::text = (storage.foldername(name))[1]`, i.e. the user-id path
+  prefix). `expo-image-picker` `~57.0.20` installed via `npx expo install`.
+  New `src/lib/avatar.ts` (picker, upload, prefix delete, pure path helpers).
+  `Avatar` takes an optional `uri` and falls back to the initial when absent
+  or on load failure, keyed so a new URI retries. Settings gained a Profile
+  subsection with Change photo / Remove; Home and Settings pass `avatar_url`.
+  Web proof against the deployed bundle: upload `POST /storage/v1/object/
+  avatars/<user_id>/avatar.jpg` → 200, public GET → 200 `image/jpeg`,
+  `users.avatar_url` persisted, image renders on both Settings and Home,
+  Remove appears only once a photo exists, and Remove drives
+  list → DELETE → `avatar_url` back to null with the image gone. That upload
+  also proves the bucket and its RLS policies exist — the one thing the
+  earlier column-level check could not confirm.
+- **Fix 6 — budget progress must not cap at 100%. IMPLEMENTED, VERIFIED.**
+  Fill ratio is `min(spent/limit, 1)` (clamped inside `ProgressBar`); the
+  displayed percent is `round(spent/limit*100)`, uncapped; over budget the
+  fill is Alert Red. The two are deliberately decoupled. Web proof with a
+  ₦1 budget against real demo spend: `aria-label="Progress 21870296%"` with
+  the bar filled `rgb(239, 61, 40)` (Alert Red) end to end
+  (`phase10a5-overbudget-home-375.png`).
+  The two design.md edits authorized for this fix and no others: §7
+  ProgressBar gained the over-budget variant line, §8 Budget gained the
+  over-budget alert-red fill line (`git diff design.md` = +2).
+- **Fix 7 — review confirm updates the display name. IMPLEMENTED, VERIFIED,
+  SCOPE EXPANDED by operator decision.** Migration
+  `000004_review_display_name.sql` (nullable `transaction_reviews.display_name`,
+  riding the existing user-owned review RLS). Review offers an optional
+  inline `Display name` field defaulting to `merchant_name ?? narration ?? ""`
+  — `normalized_merchant` deliberately excluded, because it is lowercased for
+  matching, not for display. `resolveDisplayName()` in `src/lib/txn.ts` owns
+  the order: `review.display_name` → `merchant_name` → `normalized_merchant` →
+  `narration`, skipping whitespace-only values. The operator expanded the
+  scope beyond `TransactionRow` for consistency, so it now also drives the
+  Transaction Detail title and the Insights top-merchant label. In Insights
+  only the display label changed; `merchantKey` still keys the aggregation, so
+  the winning merchant cannot change. **Provider facts stay immutable**:
+  the raw narration is still shown verbatim in the Detail "Narration" fact
+  row and is not editable anywhere.
+  Web proof: seeding `display_name` made Home and Activity show the new name
+  with the old merchant gone; the Detail title read `Zainuu Fresh Mart` while
+  the fact row still read `Narration: Medplus Pharmacy ref 178991`
+  (`phase10a5-displayname-*.png`).
+- **DEFERRED, unchanged from Phase 10A:** legend wrap at 375; Expo
+  header-back chrome on light screens; Ask Reconcile yellow entry tint;
+  Budget Ask entry; white-on-alert-red 12px contrast on the starburst
+  callout.
+
+### Checks on the fix tree
+- `npx tsc --noEmit` → 0. `npx eslint .` → 0.
+- `npm test` → 20 suites passed, 1 skipped (live); 183 passed, 2
+  live-skipped; `check:tokens` 0 violations. `native-safety` green.
+  New coverage this phase: `pillNavClearance`/`PILL_NAV_HEIGHT` and the
+  pill's own `minHeight` (wave7), axis-label shrink/ellipsize for both charts
+  (charts), Detail title + preserved narration and Insights top-merchant
+  display name (screens9), avatar uri/photo/failure fallback (wave6),
+  `resolveDisplayName` order (screens), over-budget red fill + uncapped
+  percent (wave8), avatar path helpers (avatar.test.ts).
+- `npx expo export -p web` → success, 20 static routes.
+- `tests/setup.js` gained a `react-native-safe-area-context` mock: no screen
+  test renders a `SafeAreaProvider` and `useSafeAreaInsets()` throws without
+  one, so the hook returns the library's own zero-inset default. Production
+  code uses the real hook; only the test environment is stubbed.
+
+### Deploy and web regression
+- Pushed `5e64d16`; Vercel READY. **The Phase 10A production alias
+  `reconcile-jhmath5cq-uhhh2.vercel.app` now serves a stale bundle — the live
+  production alias is `https://reconcile-uhhh2.vercel.app` (also
+  `reconcile-two-tau.vercel.app`).** All three current aliases
+  (`reconcile-uhhh2`, `reconcile-two-tau`, `reconcile-git-main-uhhh2`) point at
+  deployment `dpl_BuJZCX6Fk7ihXDjHbwDord35S2SF` = `5e64d16`. Use
+  `reconcile-uhhh2.vercel.app` going forward.
+- `curl -sIL https://reconcile-uhhh2.vercel.app` → 200. Deployed bundle
+  carries the new Fix 5 markers (`Change photo`, `settings-photo-change`,
+  `avatars`, `budget-scroll`, `insights-scroll`, `settings-scroll`) and still
+  carries the Phase 10A `Edit budget` marker — no Phase 10A regression.
+- Bundle secret scan: exactly one Supabase-URL match
+  (`https://ztfqckfdvchcqksluqri.supabase.co`); the single `sb_secret_` hit is
+  supabase-js's `startsWith("sb_secret_")` prefix-check function body, not a
+  value. No secret in the bundle.
+- Agent-as-user web pass (Playwright, headless Chromium, throwaway users via
+  the Supabase admin API with `email_confirm`, reduced motion on): sign-in →
+  demo sync (55 txns) → budget create → review confirm with an edited display
+  name → Activity → Home → Settings → Detail, at **375×812 and 1280×800**.
+  Zero console errors. Zero 4xx/5xx. Zero overflowing elements, zero
+  unlabeled icon buttons, zero sub-44px targets on every audited screen
+  (the one 30×30 control reported is the known deferred Expo web header-back
+  chrome on light screens). The only network entries were two
+  `net::ERR_ABORTED` on a `transaction_reviews` count, which is the
+  screen-change abort of an in-flight request, not a failure.
+  Screenshots: `docs/browser-tools/phase10a5-*.png` (22 files).
+- Visual proof read directly, not just asserted: Home renders on Ink with no
+  light bar and the over-budget bar is full Alert Red with an uncapped pill
+  (`phase10a5-overbudget-home-375.png`); Settings shows the uploaded yellow
+  avatar with Change photo and Remove (`phase10a5-avatar-upload-375.png`).
+
+### Preview APK
+- EAS build (NOT a dev client) from `5e64d16`, profile `preview`, SDK 57,
+  `com.onyebuchidaniel.reconcile`, status FINISHED, `gitCommitHash
+  5e64d16de279e2dc92db460b40cda38b52eea0f5`. Submitted with
+  `EAS_SKIP_AUTO_FINGERPRINT=1` (local fingerprint computation stalls on this
+  machine); credentials and profile unchanged.
+- Build:
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/0d881bce-05d8-4526-8fec-55141e3410f1`
+- APK:
+  `https://expo.dev/artifacts/eas/FYBzbNpgavXSNRtMCzWpHyah19oOolve-ZgLr0AfOCo.apk`
+  (verified reachable, HTTP 200, 110,391,525 bytes)
+
+### Needs a real device
+- **Fix 3** — the whole defect was native-only; the fix is unit-tested and
+  web-clean, but only an Android install can prove the overflow is gone.
+- **Fix 4** — the clearance value is confirmed on web; whether the pill
+  clearance reads as excessive bottom whitespace on a real device (pill nav is
+  in flow on these four screens) needs eyes on hardware.
+- **Fix 5** — the full upload/render/remove path is proven in a browser
+  against the live bucket; the Android gallery picker and camera-roll
+  permission prompt still need a device.
+- **Fix 1** — `headerShown: false` also removes the visible back affordance
+  on Home on native (Home is the pill-nav root, and its header had no
+  explicit back button). Confirm that is acceptable to the operator.
+- **Fix 6** — the red/uncapped bar is proven in a browser; confirm it reads
+  correctly beside the Phase 10A starburst on a real screen.
+
+- Explicit statement: "Phase 10B pending operator re-verification at
+  `https://expo.dev/artifacts/eas/FYBzbNpgavXSNRtMCzWpHyah19oOolve-ZgLr0AfOCo.apk`.
+  SKILL_FRONTEND_DESIGN.md rewrite remains gated on that verification."
+- SKILL_FRONTEND_DESIGN.md still untouched (§10 evolution log still the
+  template). Phase 10B and Phase 11 NOT started.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
