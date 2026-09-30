@@ -43,12 +43,22 @@ on web.
 | 4 | Wave 1–3 primitives | ✅ Complete |
 | 5 | Wave 4–5: charts, motion, haptics | ✅ Complete |
 | 6 | Wave 6–7: rows, states, shells, navigation | ✅ Complete |
+| 7 | Wave 8 feature organisms + native build pipeline | ✅ Complete |
+| 8 | Screen rebuild: onboarding, auth, Home, Review | ✅ Complete |
+| 9 | Screen rebuild: Activity, Detail, Budget, Insights, Ask, Settings | ✅ Complete |
+| 10 | Dual-surface audit and `SKILL_FRONTEND_DESIGN.md` v1 | 🔄 In progress — Phase 10A, 10A.5, 10B, 10B.5 complete; Phase 10B close pending |
 
 Phase 2 was delivered in two slices, deployed to Vercel, and verified by the
 operator in a browser. Browser-runtime bugs found and fixed (CORS preflight on
 Edge Functions, missing `babel-preset-expo` + whole-object env reads,
 per-weight font family mismatch). Learnings recorded in
 `SKILL_LEAN_DELIVERY.md` §8.
+
+Phases 3–10B.5 are implemented, tested, deployed, and committed. Per-phase
+commits, defect lists, agent-as-user pass evidence, and the exact next task are
+recorded in `AI_HANDOFF.md`, whose "Current state" block is authoritative on
+status. This table is a status summary, not a substitute for that file; if the
+two disagree, `AI_HANDOFF.md` wins and this table is corrected.
 
 ---
 
@@ -57,8 +67,9 @@ per-weight font family mismatch). Learnings recorded in
 ### FRONTEND LAYER
 
 #### Phase 7 — Wave 8 feature organisms + native build pipeline
-**Status:** In progress. Organisms shipped at `b5a7ff2`. Native build pipeline
-landing now to complete the phase.
+**Status:** Complete. Organisms shipped at `b5a7ff2`; the native build pipeline
+and the first Android APK shipped at `0211c39`. Native runtime verification
+followed in the Phase 7 native smoke-test pass.
 
 **Objective:** Complete the frontend component stack with the composite feature
 cards, and establish the native build pipeline (EAS) that every phase from
