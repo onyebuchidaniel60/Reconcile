@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { categorySpend, formatMinor, periodSpend } from "../supabase/functions/_shared/finance";
 import { Button } from "../src/components/Button";
 import { CategoryCircle } from "../src/components/CategoryCircle";
@@ -9,7 +10,7 @@ import { ErrorState } from "../src/components/ErrorState";
 import { ExpensesBarCard } from "../src/components/organisms/ExpensesBarCard";
 import { LoadingState } from "../src/components/LoadingState";
 import { PositiveMessageCard } from "../src/components/organisms/PositiveMessageCard";
-import { PillNav } from "../src/components/PillNav";
+import { PillNav, pillNavClearance } from "../src/components/PillNav";
 import { ProgressBar } from "../src/components/ProgressBar";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { SpendTrendCard } from "../src/components/organisms/SpendTrendCard";
@@ -62,6 +63,7 @@ function toRows(txns: Transaction[]) {
 
 export default function BudgetScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
@@ -205,7 +207,14 @@ export default function BudgetScreen() {
   return (
     <ScreenScaffold titleFirst="Monthly" titleSecond="Budget" scroll={false} testID="budget">
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1 }}>
+        {/* Phase 10A.5: same scrollable-content pattern as Settings so the
+          caps list and Edit action stay reachable on short screens; the
+          bottom padding is the measured pill clearance. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: pillNavClearance(insets.bottom) }}
+          testID="budget-scroll"
+        >
           <ExpensesBarCard
             bars={bars}
             axisTicks={[
@@ -270,10 +279,23 @@ export default function BudgetScreen() {
                       justifyContent: "space-between",
                     }}
                   >
-                    <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+                    {/* Phase 10A.5: flexShrink keeps long category/amount
+                      strings inside narrow (360dp) screens — Android Yoga
+                      does not shrink row children by default, which pushed
+                      this line past the screen edge. */}
+                    <Text
+                      role="small"
+                      color="ink"
+                      style={{ fontWeight: "600", flexShrink: 1 }}
+                      numberOfLines={1}
+                    >
                       {cap.label}
                     </Text>
-                    <Text role="small" color="ink" style={{ opacity: 0.6 }}>
+                    <Text
+                      role="small"
+                      color="ink"
+                      style={{ opacity: 0.6, flexShrink: 1 }}
+                    >
                       {formatMinor(cap.spent, currency)} of {formatMinor(cap.limit, currency)}
                     </Text>
                   </View>
@@ -296,7 +318,7 @@ export default function BudgetScreen() {
               testID="budget-edit"
             />
           </View>
-        </View>
+        </ScrollView>
         <PillNav
           active="budget"
           onNavigate={(route) => router.push(PILL_ROUTES[route])}

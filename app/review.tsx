@@ -7,12 +7,14 @@ import {
   categoryTintFor,
   directionFor,
   formatRowDate,
+  resolveDisplayName,
 } from "../src/lib/txn";
 import { Button } from "../src/components/Button";
 import { Chip } from "../src/components/Chip";
 import { DarkScreenScaffold } from "../src/components/DarkScreenScaffold";
 import { EmptyState } from "../src/components/EmptyState";
 import { ErrorState } from "../src/components/ErrorState";
+import { Input } from "../src/components/Input";
 import { LoadingState } from "../src/components/LoadingState";
 import { ReviewHeader } from "../src/components/organisms/ReviewHeader";
 import { Text } from "../src/components/Text";
@@ -37,6 +39,7 @@ export default function ReviewScreen() {
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [picked, setPicked] = useState<Record<string, string>>({});
+  const [names, setNames] = useState<Record<string, string>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -94,15 +97,27 @@ export default function ReviewScreen() {
     };
   }, [fetchData, applyData]);
 
+  const defaultNameFor = useCallback(
+    (item: ReviewItem): string =>
+      item.transaction.merchant_name ?? item.transaction.narration ?? "",
+    [],
+  );
+
   const confirm = async () => {
     const item = items.find((r) => r.transaction_id === selectedId);
     if (!item || busy) return;
     const categoryId = picked[item.transaction_id] ?? item.category_id ?? "other";
+    const rawName = (names[item.transaction_id] ?? defaultNameFor(item)).trim();
     setBusy(true);
     setError(null);
     try {
       pulse();
-      await confirmReview(item.transaction_id, categoryId);
+      await confirmReview(
+        item.transaction_id,
+        categoryId,
+        undefined,
+        rawName.length > 0 ? rawName : undefined,
+      );
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Confirm failed.");
@@ -173,7 +188,7 @@ export default function ReviewScreen() {
             return (
               <View>
                 <TransactionRow
-                  merchant={t.merchant_name ?? "Unknown"}
+                  merchant={resolveDisplayName(item, t)}
                   date={formatRowDate(t.occurred_at)}
                   amount={t.amount_minor}
                   currency={t.currency}
@@ -203,6 +218,20 @@ export default function ReviewScreen() {
                           />
                         </View>
                       ))}
+                    </View>
+                    <View style={{ marginTop: spacing.sm }}>
+                      <Input
+                        label="Display name"
+                        tone="dark"
+                        value={names[item.transaction_id] ?? defaultNameFor(item)}
+                        onChangeText={(value) =>
+                          setNames((current) => ({
+                            ...current,
+                            [item.transaction_id]: value,
+                          }))
+                        }
+                        testID={`review-name-${item.transaction_id}`}
+                      />
                     </View>
                     <Link
                       href={`/transaction/${t.id}`}

@@ -6,10 +6,11 @@ import { DarkScreenScaffold } from "../src/components/DarkScreenScaffold";
 import { FormScaffold } from "../src/components/FormScaffold";
 import { Input } from "../src/components/Input";
 import { PairedTitle } from "../src/components/PairedTitle";
-import { PillNav } from "../src/components/PillNav";
+import { PillNav, PILL_NAV_HEIGHT, pillNavClearance } from "../src/components/PillNav";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { Text } from "../src/components/Text";
 import { colors } from "../src/theme/colors";
+import { spacing } from "../src/theme/spacing";
 
 // Scaffold renders compile many modules on first mount; allow headroom under
 // parallel load so the suite is deterministic on saturated machines.
@@ -181,5 +182,17 @@ describe("Wave 7 PillNav", () => {
     expect(StyleSheet.flatten(screen.getByTestId("pill-dark").props.style).backgroundColor).toBe(
       colors.ink,
     );
+  });
+
+  it("exports its own height and the clearance screens reserve (Phase 10A.5, Fix 4)", async () => {
+    // 44px touch target plus spacing.sm above and below.
+    expect(PILL_NAV_HEIGHT).toBe(44 + spacing.sm * 2);
+    // Safe-area inset + pill height + one spacing.lg gap.
+    expect(pillNavClearance(0)).toBe(PILL_NAV_HEIGHT + spacing.lg);
+    expect(pillNavClearance(48)).toBe(48 + PILL_NAV_HEIGHT + spacing.lg);
+    // The rendered pill is at least the value screens reserve for it.
+    await render(<PillNav active="home" onNavigate={() => {}} testID="pill-measured" />);
+    const style = StyleSheet.flatten(screen.getByTestId("pill-measured").props.style);
+    expect(style.minHeight).toBe(PILL_NAV_HEIGHT);
   });
 });

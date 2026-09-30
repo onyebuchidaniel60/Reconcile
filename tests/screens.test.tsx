@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import type { ReactNode } from "react";
 import * as motion from "../src/theme/motion";
-import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, monthSampleDays, periodIncome } from "../src/lib/txn";
+import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, monthSampleDays, periodIncome, resolveDisplayName } from "../src/lib/txn";
 import {
   confirmReview,
   connectDemo,
@@ -11,6 +11,7 @@ import {
   getCategories,
   getCurrentMonthBudget,
   getPendingReviews,
+  getProfile,
   getReviewCount,
   getTransactions,
   syncConnection,
@@ -68,6 +69,7 @@ jest.mock("../src/lib/db", () => ({
   connectDemo: jest.fn(),
   syncConnection: jest.fn(),
   getActiveConnection: jest.fn(),
+  getProfile: jest.fn(),
 }));
 
 type MockFn = ReturnType<typeof jest.fn>;
@@ -81,6 +83,7 @@ const mockConfirmReview = confirmReview as unknown as MockFn;
 const mockConnectDemo = connectDemo as unknown as MockFn;
 const mockSyncConnection = syncConnection as unknown as MockFn;
 const mockGetActiveConnection = getActiveConnection as unknown as MockFn;
+const mockGetProfile = getProfile as unknown as MockFn;
 
 const CATEGORIES = [
   { id: "food", label: "Food" },
@@ -135,6 +138,7 @@ beforeEach(() => {
     mockConnectDemo,
     mockSyncConnection,
     mockGetActiveConnection,
+    mockGetProfile,
   ]) {
     fn.mockReset();
   }
@@ -155,6 +159,7 @@ beforeEach(() => {
   mockGetPendingReviews.mockResolvedValue([reviewItem()]);
   mockConfirmReview.mockResolvedValue(undefined);
   mockGetActiveConnection.mockResolvedValue(null);
+  mockGetProfile.mockResolvedValue(null);
   mockConnectDemo.mockResolvedValue({ connection: { id: "c1" } });
   mockSyncConnection.mockResolvedValue({ seen: 55, added: 55, internal_transfer_pairs: 1 });
 });
@@ -239,10 +244,14 @@ describe("Home screen", () => {
     expect(screen.getByText("September 2026")).toBeTruthy();
     expect(screen.getByText("Budget Overview")).toBeTruthy();
     expect(screen.getByText("Bolt")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Open menu" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "View cards" })).toBeTruthy();
-    for (const label of ["Home", "Activity", "Budget", "Insights"]) {
-      expect(screen.getByRole("button", { name: label })).toBeTruthy();
+    expect(screen.getByTestId("home-menu").props.accessibilityLabel).toBe(
+      "Insights",
+    );
+    expect(screen.getByTestId("home-cards").props.accessibilityLabel).toBe(
+      "Budget",
+    );
+    for (const route of ["home", "activity", "budget", "insights"]) {
+      expect(screen.getByTestId(`home-pill-${route}`)).toBeTruthy();
     }
     expect(screen.getByRole("button", { name: "Home" }).props.accessibilityState.selected).toBe(
       true,
@@ -255,6 +264,16 @@ describe("Home screen", () => {
     await screen.findByText("Hey, Adaeze");
     await fireEvent.press(screen.getByTestId("home-pill-activity"));
     expect(mockPush).toHaveBeenCalledWith("/activity");
+  });
+
+  it("header icons navigate to Insights and Budget (Phase 10A.5)", async () => {
+    mockSessionEmail = "adaeze@example.com";
+    await render(<HomeScreen />);
+    await screen.findByText("Hey, Adaeze");
+    await fireEvent.press(screen.getByTestId("home-menu"));
+    expect(mockPush).toHaveBeenCalledWith("/insights");
+    await fireEvent.press(screen.getByTestId("home-cards"));
+    expect(mockPush).toHaveBeenCalledWith("/budget");
   });
 
   it("shows the empty state without accounts", async () => {
@@ -290,6 +309,18 @@ describe("Home screen", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Open settings" }));
     expect(mockPush).toHaveBeenCalledWith("/settings");
   });
+
+  it("shows the profile photo on the avatar when set (Phase 10A.5)", async () => {
+    mockSessionEmail = "adaeze@example.com";
+    mockGetProfile.mockResolvedValue({
+      id: "u1",
+      email: "adaeze@example.com",
+      avatar_url: "https://example.com/avatar.jpg",
+    });
+    await render(<HomeScreen />);
+    await screen.findByText("Hey, Adaeze");
+    expect(screen.getByTestId("home-avatar-image")).toBeTruthy();
+  });
 });
 
 describe("Review screen", () => {
@@ -302,8 +333,23 @@ describe("Review screen", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Set Food" }));
     mockGetPendingReviews.mockResolvedValue([]);
     await fireEvent.press(screen.getByRole("button", { name: /Confirm/ }));
-    await waitFor(() => expect(mockConfirmReview).toHaveBeenCalledWith("t1", "food"));
+    await waitFor(() =>
+      expect(mockConfirmReview).toHaveBeenCalledWith("t1", "food", undefined, "Bolt"),
+    );
     expect(await screen.findByText("All caught up. Review complete.")).toBeTruthy();
+  });
+
+  it("saves an edited display name on confirm (Phase 10A.5)", async () => {
+    await render(<ReviewScreen />);
+    await screen.findByText("Bolt");
+    const field = screen.getByLabelText("Display name");
+    expect(field.props.value).toBe("Bolt");
+    await fireEvent.changeText(field, "Bolt Ride");
+    mockGetPendingReviews.mockResolvedValue([]);
+    await fireEvent.press(screen.getByRole("button", { name: /Confirm/ }));
+    await waitFor(() =>
+      expect(mockConfirmReview).toHaveBeenCalledWith("t1", "transport", undefined, "Bolt Ride"),
+    );
   });
 
   it("selects a row to reveal chips and a details entry", async () => {
@@ -378,6 +424,25 @@ describe("txn display helpers", () => {
     expect(monthSampleDays("2026-09-01")).toEqual([1, 10, 20, 30]);
     expect(monthSampleDays("2026-02-01")).toEqual([1, 10, 19, 28]);
     expect(monthSampleDays("2024-02-01")).toEqual([1, 10, 20, 29]);
+  });
+
+  it("resolves display names in operator order (Phase 10A.5)", () => {
+    const base = { merchant_name: "Shoprite", normalized_merchant: "shoprite", narration: "Shoprite ref 1" };
+    expect(resolveDisplayName({ display_name: "Shoprite Run" }, base)).toBe("Shoprite Run");
+    expect(resolveDisplayName({ display_name: null }, base)).toBe("Shoprite");
+    expect(resolveDisplayName(null, base)).toBe("Shoprite");
+    // merchant_name wins over normalized_merchant even when both are set.
+    expect(
+      resolveDisplayName(null, { merchant_name: "Shoprite", normalized_merchant: "shoprite", narration: null }),
+    ).toBe("Shoprite");
+    expect(
+      resolveDisplayName(null, { merchant_name: null, normalized_merchant: "shoprite", narration: null }),
+    ).toBe("shoprite");
+    expect(
+      resolveDisplayName(null, { merchant_name: null, normalized_merchant: null, narration: "Shoprite ref 1" }),
+    ).toBe("Shoprite ref 1");
+    expect(resolveDisplayName(null, {})).toBe("Unknown");
+    expect(resolveDisplayName({ display_name: "  " }, base)).toBe("Shoprite");
   });
 
   it("sums in-month income regardless of eligibility", () => {

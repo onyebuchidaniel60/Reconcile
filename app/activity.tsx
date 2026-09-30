@@ -1,11 +1,12 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Chip } from "../src/components/Chip";
 import { EmptyState } from "../src/components/EmptyState";
 import { ErrorState } from "../src/components/ErrorState";
 import { LoadingState } from "../src/components/LoadingState";
-import { PillNav } from "../src/components/PillNav";
+import { PillNav, pillNavClearance } from "../src/components/PillNav";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { Text } from "../src/components/Text";
 import { TransactionRow } from "../src/components/TransactionRow";
@@ -21,6 +22,7 @@ import {
   categoryTintFor,
   directionFor,
   formatRowDate,
+  resolveDisplayName,
 } from "../src/lib/txn";
 import { spacing } from "../src/theme/spacing";
 
@@ -41,6 +43,7 @@ function filterKey(filter: Filter): string {
 
 export default function ActivityScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [txns, setTxns] = useState<Transaction[]>([]);
@@ -197,6 +200,11 @@ export default function ActivityScreen() {
               data={sections}
               keyExtractor={(item) => item.header ?? item.row!.id}
               testID="activity-list"
+              // Phase 10A.5: the measured pill clearance keeps the last row
+              // clear of the floating pill nav on short screens.
+              contentContainerStyle={{
+                paddingBottom: pillNavClearance(insets.bottom),
+              }}
               renderItem={({ item, index }) =>
                 item.header !== undefined ? (
                   <Text
@@ -212,7 +220,10 @@ export default function ActivityScreen() {
                   </Text>
                 ) : (
                   <TransactionRow
-                    merchant={item.row!.merchant_name ?? "Unknown"}
+                    merchant={resolveDisplayName(
+                      item.row!.transaction_reviews?.[0],
+                      item.row!,
+                    )}
                     date={formatRowDate(item.row!.occurred_at)}
                     amount={item.row!.amount_minor}
                     currency={item.row!.currency}

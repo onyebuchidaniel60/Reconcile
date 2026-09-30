@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Image, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from "react-native";
 import { colors } from "../theme/colors";
 import { radius } from "../theme/radius";
@@ -10,6 +11,8 @@ interface AvatarProps {
   size?: AvatarSize;
   /** Optional photo. When provided the image renders instead of the initial. */
   photoSource?: ImageSourcePropType;
+  /** Convenience for remote photos: `{ uri }` unless null. */
+  uri?: string | null;
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -41,15 +44,24 @@ export function avatarInitialForName(displayName: string): string {
 
 /**
  * Circular avatar: initial-based with a deterministic secondary-surface
- * tint and ink text, or a photo when `photoSource` is provided.
+ * tint and ink text, or a photo when `photoSource`/`uri` is provided. A
+ * photo that fails to load falls back to the initial (never a blank hole).
  */
 export function Avatar({
   displayName,
   size = 40,
   photoSource,
+  uri,
   testID,
   style,
 }: AvatarProps) {
+  // A photo that fails to load falls back to the initial. The failure is
+  // keyed by source so a *new* uri retries instead of inheriting the old
+  // failure — no effect needed.
+  const [failedKey, setFailedKey] = useState<string | null>(null);
+  const source = photoSource ?? (uri ? { uri } : undefined);
+  const sourceKey = uri ?? (photoSource ? "external-photo" : null);
+  const showPhoto = source !== undefined && failedKey !== sourceKey;
   const circle = {
     width: size,
     height: size,
@@ -65,12 +77,17 @@ export function Avatar({
       testID={testID}
       style={[
         circle,
-        { backgroundColor: photoSource ? colors.line : avatarTintForName(displayName) },
+        { backgroundColor: showPhoto ? colors.line : avatarTintForName(displayName) },
         style,
       ]}
     >
-      {photoSource ? (
-        <Image source={photoSource} style={{ width: size, height: size }} />
+      {showPhoto ? (
+        <Image
+          source={source}
+          onError={() => setFailedKey(sourceKey)}
+          testID={testID ? `${testID}-image` : "avatar-image"}
+          style={{ width: size, height: size }}
+        />
       ) : (
         <Text role={SIZE_ROLES[size]} color="ink" style={{ fontWeight: "600" }}>
           {avatarInitialForName(displayName)}

@@ -65,6 +65,13 @@ export function ExpensesBarCard({
           <ChevronDown size={20} color={colors.ink} strokeWidth={1.5} />
         </Pressable>
         <View style={{ marginTop: spacing.md }}>
+          {/* Phase 10A.5 (Fix 3), investigated and cleared: the callout
+            overflow reported on Android is not in this card. The starburst
+            is a fixed 48px box in an `alignItems: "center"` wrapper with no
+            width of its own, so it cannot exceed the card's content width,
+            and its text is the compact form fixed in Phase 10A. The overflow
+            came from non-shrinking row children (chart axis labels and the
+            category-cap row), fixed in BarChart/LineChart/budget.tsx. */}
           <BarChart
             bars={bars}
             axisTicks={axisTicks}

@@ -36,6 +36,13 @@ export interface TxnReview {
   status: string;
   category_id: string | null;
   user_note: string | null;
+  display_name?: string | null;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string | null;
+  avatar_url: string | null;
 }
 
 export interface Transaction {
@@ -60,6 +67,7 @@ export interface ReviewItem {
   status: string;
   category_id: string | null;
   user_note: string | null;
+  display_name?: string | null;
   transaction: Transaction;
 }
 
@@ -87,6 +95,24 @@ async function currentUserId(): Promise<string> {
   const { data, error } = await getSupabase().auth.getUser();
   if (error || !data.user) throw new Error("Please sign in and try again.");
   return data.user.id;
+}
+
+export async function getProfile(): Promise<UserProfile | null> {
+  const { data, error } = await getSupabase()
+    .from("users")
+    .select("id,email,avatar_url")
+    .maybeSingle();
+  if (error) throw new Error(friendly(error, "Could not load profile."));
+  return (data as UserProfile | null) ?? null;
+}
+
+export async function setAvatarUrl(url: string | null): Promise<void> {
+  const userId = await currentUserId();
+  const { error } = await getSupabase()
+    .from("users")
+    .update({ avatar_url: url })
+    .eq("id", userId);
+  if (error) throw new Error(friendly(error, "Could not save photo."));
 }
 
 export async function getActiveConnection(): Promise<BankConnection | null> {
@@ -170,7 +196,7 @@ export async function getPendingReviews(): Promise<ReviewItem[]> {
   const { data, error } = await getSupabase()
     .from("transaction_reviews")
     .select(
-      "id,transaction_id,status,category_id,user_note,transaction:transactions(id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,bank_accounts(display_name))",
+      "id,transaction_id,status,category_id,user_note,display_name,transaction:transactions(id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,bank_accounts(display_name))",
     )
     .eq("status", "needs_review")
     .order("created_at");
@@ -191,7 +217,7 @@ export async function getTransactions(limit = 200): Promise<Transaction[]> {
   const { data, error } = await getSupabase()
     .from("transactions")
     .select(
-      "id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,transaction_reviews(status,category_id,user_note),bank_accounts(display_name)",
+      "id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,transaction_reviews(status,category_id,user_note,display_name),bank_accounts(display_name)",
     )
     .order("occurred_at", { ascending: false })
     .limit(limit);
@@ -212,7 +238,7 @@ export async function getTransaction(
   const { data, error } = await getSupabase()
     .from("transactions")
     .select(
-      "id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,transaction_reviews(status,category_id,user_note),bank_accounts(display_name,masked_account_number)",
+      "id,bank_account_id,amount_minor,currency,direction,semantic_type,occurred_at,merchant_name,narration,normalized_merchant,budget_eligible,transaction_reviews(status,category_id,user_note,display_name),bank_accounts(display_name,masked_account_number)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -230,6 +256,7 @@ export async function confirmReview(
   transactionId: string,
   categoryId: string,
   userNote?: string,
+  displayName?: string,
 ): Promise<void> {
   const supabase = getSupabase();
   const { error } = await supabase
@@ -238,6 +265,9 @@ export async function confirmReview(
       status: "reconciled",
       category_id: categoryId,
       user_note: userNote ?? null,
+      // Only overwrite an existing display name when the caller provides
+      // one (the detail screen never edits names).
+      ...(displayName !== undefined ? { display_name: displayName } : null),
       confirmed_at: new Date().toISOString(),
       source: "user:confirm",
     })

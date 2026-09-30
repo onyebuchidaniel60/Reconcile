@@ -7,6 +7,7 @@ import {
   getAccounts,
   getCategories,
   getCurrentMonthBudget,
+  getProfile,
   getReviewCount,
   getTransactions,
   type Budget,
@@ -21,6 +22,7 @@ import {
   formatPeriodLabel,
   formatRowDate,
   periodIncome,
+  resolveDisplayName,
 } from "../src/lib/txn";
 import { Avatar } from "../src/components/Avatar";
 import { BudgetOverviewCard } from "../src/components/organisms/BudgetOverviewCard";
@@ -35,6 +37,7 @@ import { PairedTitle } from "../src/components/PairedTitle";
 import { PillNav, type PillRoute } from "../src/components/PillNav";
 import { Text } from "../src/components/Text";
 import { TransactionRow } from "../src/components/TransactionRow";
+import { select } from "../src/lib/haptics";
 import { colors } from "../src/theme/colors";
 import { spacing } from "../src/theme/spacing";
 
@@ -70,16 +73,18 @@ export default function HomeScreen() {
   const [reviewCount, setReviewCount] = useState(0);
   const [recent, setRecent] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    const [accounts, txns, count, { budget }, cats] = await Promise.all([
+    const [accounts, txns, count, { budget }, cats, profile] = await Promise.all([
       getAccounts(),
       getTransactions(50),
       getReviewCount(),
       getCurrentMonthBudget(),
       getCategories(),
+      getProfile(),
     ]);
-    return { accounts, txns, count, budget, cats };
+    return { accounts, txns, count, budget, cats, profile };
   }, []);
 
   const applyHomeData = useCallback(
@@ -89,6 +94,7 @@ export default function HomeScreen() {
       count: number,
       budget: Budget | null,
       cats: Category[],
+      profile: { avatar_url: string | null } | null,
     ) => {
       setHasAccounts(accounts.length > 0);
       const now = new Date();
@@ -116,6 +122,7 @@ export default function HomeScreen() {
       setReviewCount(count);
       setRecent(txns.slice(0, 5));
       setCategories(cats);
+      setAvatarUrl(profile?.avatar_url ?? null);
     },
     [],
   );
@@ -124,8 +131,8 @@ export default function HomeScreen() {
     setLoading(true);
     setError(null);
     try {
-      const { accounts, txns, count, budget, cats } = await fetchData();
-      applyHomeData(accounts, txns, count, budget, cats);
+      const { accounts, txns, count, budget, cats, profile } = await fetchData();
+      applyHomeData(accounts, txns, count, budget, cats, profile);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load home.");
     } finally {
@@ -137,9 +144,9 @@ export default function HomeScreen() {
     let active = true;
     (async () => {
       try {
-        const { accounts, txns, count, budget, cats } = await fetchData();
+        const { accounts, txns, count, budget, cats, profile } = await fetchData();
         if (!active) return;
-        applyHomeData(accounts, txns, count, budget, cats);
+        applyHomeData(accounts, txns, count, budget, cats, profile);
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Could not load home.");
@@ -216,20 +223,35 @@ export default function HomeScreen() {
                   onPress={() => router.push("/settings")}
                   testID="home-avatar-button"
                 >
-                  <Avatar displayName={name} size={48} testID="home-avatar" />
+                  <Avatar
+                    displayName={name}
+                    size={48}
+                    uri={avatarUrl}
+                    testID="home-avatar"
+                  />
                 </Pressable>
                 <View style={{ flexDirection: "row" }}>
+                  {/* Phase 10A.5: shortcuts duplicating PillNav destinations
+                    (operator request). Grid → Insights, card → Budget. */}
                   <IconButton
-                    accessibilityLabel="Open menu"
+                    accessibilityLabel="Insights"
                     tone="dark"
+                    onPress={() => {
+                      void select();
+                      router.push("/insights");
+                    }}
                     testID="home-menu"
                   >
                     <LayoutGrid size={24} color={colors.paper} strokeWidth={1.5} />
                   </IconButton>
                   <View style={{ marginLeft: spacing.sm }}>
                     <IconButton
-                      accessibilityLabel="View cards"
+                      accessibilityLabel="Budget"
                       tone="dark"
+                      onPress={() => {
+                        void select();
+                        router.push("/budget");
+                      }}
                       testID="home-cards"
                     >
                       <CreditCard size={24} color={colors.paper} strokeWidth={1.5} />
@@ -310,7 +332,7 @@ export default function HomeScreen() {
           }
           renderItem={({ item }) => (
             <TransactionRow
-              merchant={item.merchant_name ?? "Unknown"}
+              merchant={resolveDisplayName(item.transaction_reviews?.[0], item)}
               date={formatRowDate(item.occurred_at)}
               amount={item.amount_minor}
               currency={item.currency}

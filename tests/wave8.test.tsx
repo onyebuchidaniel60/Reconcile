@@ -11,6 +11,7 @@ import { PositiveMessageCard } from "../src/components/organisms/PositiveMessage
 import { ReviewHeader } from "../src/components/organisms/ReviewHeader";
 import { SpendTrendCard } from "../src/components/organisms/SpendTrendCard";
 import * as motion from "../src/theme/motion";
+import { colors } from "../src/theme/colors";
 
 const BARS = [
   { label: "May", value: 9800000, fill: "ink" },
@@ -91,6 +92,42 @@ describe("Wave 8 BudgetOverviewCard", () => {
         "Budget overview. Spent ₦125,000.00 of ₦250,000.00, Sept 1, 2026 to Sept 30, 2026.",
       ),
     ).toBeTruthy();
+  });
+
+  it("renders over-budget uncapped with an alert-red fill (Phase 10A.5)", async () => {
+    const { toJSON } = await render(
+      <BudgetOverviewCard
+        spent={30250000}
+        limit={25000000}
+        currency="NGN"
+        periodStart="Sept 1, 2026"
+        periodEnd="Sept 30, 2026"
+        progress={1.21}
+        testID="budget-over"
+      />,
+    );
+    expect(screen.getByText("121%")).toBeTruthy();
+    const found: unknown[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(walk);
+        return;
+      }
+      if (!node || typeof node !== "object") return;
+      const style = (node as { props?: { style?: unknown } }).props?.style;
+      const first = Array.isArray(style) ? style[0] : style;
+      if (
+        first &&
+        typeof first === "object" &&
+        (first as { backgroundColor?: string }).backgroundColor === colors.alertRed
+      ) {
+        found.push(node);
+      }
+      const children = (node as { children?: unknown }).children;
+      if (Array.isArray(children)) children.forEach(walk);
+    };
+    walk(toJSON());
+    expect(found.length).toBeGreaterThan(0);
   });
 });
 

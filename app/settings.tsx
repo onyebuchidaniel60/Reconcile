@@ -1,20 +1,31 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Constants from "expo-constants";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronRight, CircleUser, CreditCard, Info, LogOut, Shield } from "lucide-react-native";
+import { Avatar } from "../src/components/Avatar";
+import { Button } from "../src/components/Button";
 import { Card } from "../src/components/Card";
 import { EmptyState } from "../src/components/EmptyState";
 import { ErrorState } from "../src/components/ErrorState";
 import { LoadingState } from "../src/components/LoadingState";
-import { PillNav } from "../src/components/PillNav";
+import { PillNav, pillNavClearance } from "../src/components/PillNav";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { Text } from "../src/components/Text";
+import {
+  pickAvatarImage,
+  removeAvatarObjects,
+  uploadAvatarImage,
+} from "../src/lib/avatar";
 import {
   disconnectConnection,
   getAccounts,
   getActiveConnection,
+  getProfile,
+  setAvatarUrl,
   type BankAccount,
+  type UserProfile,
 } from "../src/lib/db";
 import { useSession } from "../src/lib/session";
 import { colors } from "../src/theme/colors";
@@ -88,25 +99,31 @@ function SettingRow({
 export default function SettingsScreen() {
   const { session, signOut } = useSession();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const connection = await getActiveConnection();
     const list = connection ? await getAccounts() : [];
-    return { connection, list };
+    const userProfile = await getProfile();
+    return { connection, list, userProfile };
   }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const { connection, list } = await fetchData();
+      const { connection, list, userProfile } = await fetchData();
       setConnectionId(connection?.id ?? null);
       setAccounts(list);
+      setProfile(userProfile);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load settings.");
     } finally {
@@ -118,10 +135,11 @@ export default function SettingsScreen() {
     let active = true;
     (async () => {
       try {
-        const { connection, list } = await fetchData();
+        const { connection, list, userProfile } = await fetchData();
         if (!active) return;
         setConnectionId(connection?.id ?? null);
         setAccounts(list);
+        setProfile(userProfile);
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Could not load settings.");
@@ -153,6 +171,42 @@ export default function SettingsScreen() {
     router.replace("/welcome");
   };
 
+  const changePhoto = async () => {
+    if (photoBusy) return;
+    setPhotoError(null);
+    try {
+      const localUri = await pickAvatarImage();
+      if (!localUri) return;
+      if (!profile) {
+        setPhotoError("Please sign in and try again.");
+        return;
+      }
+      setPhotoBusy(true);
+      const publicUrl = await uploadAvatarImage(profile.id, localUri);
+      await setAvatarUrl(publicUrl);
+      await refresh();
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : "Photo update failed.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    if (photoBusy || !profile) return;
+    setPhotoError(null);
+    setPhotoBusy(true);
+    try {
+      await removeAvatarObjects(profile.id);
+      await setAvatarUrl(null);
+      await refresh();
+    } catch (e) {
+      setPhotoError(e instanceof Error ? e.message : "Photo removal failed.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const version = Constants.expoConfig?.version ?? "0.1.0";
 
   if (loading) {
@@ -174,7 +228,58 @@ export default function SettingsScreen() {
   return (
     <ScreenScaffold titleFirst="Your" titleSecond="Settings" scroll={false} testID="settings">
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1 }}>
+        {/* Phase 10A.5: content scrolls so the sign-out row stays
+          reachable above the pill nav on short screens; the bottom
+          padding is the measured pill clearance, not a guess. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: pillNavClearance(insets.bottom) }}
+          testID="settings-scroll"
+        >
+          <Text role="small" color="ink" style={{ fontWeight: "600", marginTop: spacing.md }}>
+            Profile
+          </Text>
+          <Card variant="paper" compact testID="settings-profile-photo">
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Avatar
+                displayName={session?.user.email ?? "Signed in"}
+                size={64}
+                uri={profile?.avatar_url ?? undefined}
+                testID="settings-avatar"
+              />
+              <View style={{ flex: 1, marginLeft: spacing.md }}>
+                <Button
+                  title={photoBusy ? "Working..." : "Change photo"}
+                  variant="secondary"
+                  onPress={changePhoto}
+                  disabled={photoBusy}
+                  loading={photoBusy}
+                  testID="settings-photo-change"
+                />
+                {profile?.avatar_url ? (
+                  <View style={{ marginTop: spacing.sm }}>
+                    <Button
+                      title="Remove"
+                      variant="ghost"
+                      onPress={removePhoto}
+                      disabled={photoBusy}
+                      testID="settings-photo-remove"
+                    />
+                  </View>
+                ) : null}
+              </View>
+            </View>
+            {photoError ? (
+              <Text
+                role="body"
+                color="ink"
+                style={{ marginTop: spacing.sm }}
+                testID="settings-photo-error"
+              >
+                {photoError}
+              </Text>
+            ) : null}
+          </Card>
           <Text role="small" color="ink" style={{ fontWeight: "600", marginTop: spacing.md }}>
             Account
           </Text>
@@ -279,7 +384,7 @@ export default function SettingsScreen() {
               testID="settings-empty"
             />
           ) : null}
-        </View>
+        </ScrollView>
         <PillNav
           active={null}
           onNavigate={(route) => router.push(PILL_ROUTES[route])}

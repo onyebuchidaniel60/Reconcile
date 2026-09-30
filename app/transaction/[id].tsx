@@ -22,6 +22,7 @@ import {
   type Transaction,
   type TxnReview,
 } from "../../src/lib/db";
+import { resolveDisplayName } from "../../src/lib/txn";
 
 function FactRow({ label, value }: { label: string; value: string }) {
   return (
@@ -169,7 +170,10 @@ export default function TransactionDetailScreen() {
         style={{ textAlign: "center", marginTop: spacing.xs }}
         testID="detail-merchant"
       >
-        {txn.merchant_name ?? "Unknown"}
+        {/* Phase 10A.5 (Fix 7): the title follows the user's display name.
+          The raw provider narration stays visible, and uneditable, in the
+          "Narration" fact row below. */}
+        {resolveDisplayName(review, txn)}
       </Text>
       <View style={{ marginTop: spacing.md }}>
         <Card variant="paper" testID="detail-facts">

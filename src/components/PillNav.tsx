@@ -9,6 +9,25 @@ export type PillRoute = "home" | "activity" | "budget" | "insights";
 
 export type PillSurface = "light" | "dark";
 
+/**
+ * Rendered height of the pill: the 44px minimum touch target (design.md §7)
+ * plus `spacing.sm` of vertical padding above and below. Exported so
+ * scrollable screens can reserve the pill's footprint with a real value
+ * instead of a hand-tuned guess (Phase 10A.5, Fix 4).
+ */
+export const PILL_NAV_HEIGHT = 44 + spacing.sm * 2;
+
+/**
+ * Bottom padding a scrollable screen needs so its last row clears the
+ * floating pill: the device safe-area inset, plus the pill's own height,
+ * plus one `spacing.lg` breathing gap. Screens call this with
+ * `useSafeAreaInsets().bottom` so the clearance is measured rather than
+ * guessed (Phase 10A.5, Fix 4).
+ */
+export function pillNavClearance(safeAreaBottom: number): number {
+  return safeAreaBottom + PILL_NAV_HEIGHT + spacing.lg;
+}
+
 interface PillItem {
   route: PillRoute;
   label: string;
@@ -36,7 +55,8 @@ interface PillNavProps {
  * pill on light screens (ink on dark), 4 icon-only items. The active item
  * carries a signal-yellow circular indicator with an ink icon; unselected
  * items are outline icons at 70%. Each item is a 44×44 press target with a
- * button role and label. Selection changes fire a selection haptic.
+ * button role and label. Selection changes fire a selection haptic. The
+ * container height is `PILL_NAV_HEIGHT`, the value screens reserve.
  */
 export function PillNav({ active, onNavigate, surface = "light", testID, style }: PillNavProps) {
   const dark = surface === "dark";
@@ -57,6 +77,7 @@ export function PillNav({ active, onNavigate, surface = "light", testID, style }
           alignItems: "center",
           justifyContent: "space-around",
           marginHorizontal: spacing.lg,
+          minHeight: PILL_NAV_HEIGHT,
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
           borderRadius: radius.pill,

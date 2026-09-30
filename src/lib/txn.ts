@@ -42,6 +42,34 @@ export function directionFor(txn: Transaction): TransactionDirection {
   return "expense";
 }
 
+export interface DisplayNameSource {
+  merchant_name?: string | null;
+  normalized_merchant?: string | null;
+  narration?: string | null;
+}
+
+/**
+ * Row title resolution (Phase 10A.5, operator-decided order): the
+ * user-confirmed display name wins; otherwise the raw provider merchant
+ * name (casing preserved); then the lowercase normalized merchant (kept
+ * for deterministic matching, not display); then the narration.
+ */
+export function resolveDisplayName(
+  review: { display_name?: string | null } | null | undefined,
+  txn: DisplayNameSource,
+): string {
+  const candidates = [
+    review?.display_name,
+    txn.merchant_name,
+    txn.normalized_merchant,
+    txn.narration,
+  ];
+  for (const candidate of candidates) {
+    if (candidate && candidate.trim().length > 0) return candidate;
+  }
+  return "Unknown";
+}
+
 function isTintName(label: string): label is CategoryTintName {
   return (
     label === "Food" ||

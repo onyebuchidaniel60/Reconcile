@@ -34,6 +34,10 @@ export function BudgetOverviewCard({
   testID,
   style,
 }: BudgetOverviewCardProps) {
+  // Phase 10A.5: over-spend shows a full bar with the UNCAPPED percentage
+  // in alert-red (design.md §7 over-budget variant); at/under budget keeps
+  // the ink fill. Display only — forecast math is untouched.
+  const over = limit > 0 && spent > limit;
   const percent = `${Math.round(progress * 100)}%`;
   const accessibilityLabel =
     `Budget overview. Spent ${formatMinor(spent, currency)} ` +
@@ -56,7 +60,7 @@ export function BudgetOverviewCard({
           <ProgressBar
             value={progress}
             label={percent}
-            variant="light"
+            variant={over ? "over-budget" : "light"}
             testID={testID ? `${testID}-progress` : "budget-overview-progress"}
           />
         </View>

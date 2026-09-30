@@ -28,3 +28,17 @@ jest.mock("react-native-reanimated", () => ({
   },
   ReduceMotion: { System: "system", Always: "always", Never: "never" },
 }));
+
+// Jest setup: no screen test renders a <SafeAreaProvider>, and
+// `useSafeAreaInsets()` throws without one. Screens call it to size their
+// bottom pill-nav clearance (Phase 10A.5, Fix 4), so the hook returns the
+// library's own zero-inset default. `SafeAreaView` never reads context —
+// it is a plain native view — so it is passed through untouched.
+jest.mock("react-native-safe-area-context", () => {
+  const actual = jest.requireActual("react-native-safe-area-context");
+  return {
+    __esModule: true,
+    ...actual,
+    useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  };
+});

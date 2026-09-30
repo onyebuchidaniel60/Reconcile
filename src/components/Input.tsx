@@ -21,6 +21,8 @@ interface InputProps {
   placeholder?: string;
   error?: string | null;
   accessibilityLabel?: string;
+  /** "dark" renders the label in paper for ink surfaces (field stays paper). */
+  tone?: "light" | "dark";
   testID?: string;
   style?: StyleProp<ViewStyle>;
 }
@@ -40,6 +42,7 @@ export function Input({
   placeholder,
   error,
   accessibilityLabel,
+  tone = "light",
   testID,
   style,
 }: InputProps) {
@@ -47,7 +50,7 @@ export function Input({
   const hasError = !!error;
   return (
     <View style={style} testID={testID}>
-      <Text role="small" color="ink">
+      <Text role="small" color={tone === "dark" ? "paper" : "ink"}>
         {label}
       </Text>
       <TextInput

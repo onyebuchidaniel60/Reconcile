@@ -1,6 +1,7 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   biggestCategoryChange,
   formatMinor,
@@ -14,7 +15,7 @@ import { EmptyState } from "../src/components/EmptyState";
 import { ErrorState } from "../src/components/ErrorState";
 import { InsightCard, type DeltaDirection } from "../src/components/organisms/InsightCard";
 import { LoadingState } from "../src/components/LoadingState";
-import { PillNav } from "../src/components/PillNav";
+import { PillNav, pillNavClearance } from "../src/components/PillNav";
 import { ScreenScaffold } from "../src/components/ScreenScaffold";
 import { Text } from "../src/components/Text";
 import {
@@ -23,6 +24,7 @@ import {
   type Category,
   type Transaction,
 } from "../src/lib/db";
+import { resolveDisplayName } from "../src/lib/txn";
 import { spacing } from "../src/theme/spacing";
 
 const PILL_ROUTES = {
@@ -55,6 +57,7 @@ function deltaOf(current: number, previous: number): { delta: number; direction:
 
 export default function InsightsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [txns, setTxns] = useState<Transaction[]>([]);
@@ -119,7 +122,9 @@ export default function InsightsScreen() {
     semanticType: t.semantic_type as Semantic,
     categoryId: t.transaction_reviews[0]?.category_id ?? undefined,
     merchantKey: t.normalized_merchant ?? undefined,
-    merchantName: t.merchant_name ?? undefined,
+    // Phase 10A.5 (Fix 7): display name only — merchantKey still drives
+    // aggregation, so this cannot change which merchant wins.
+    merchantName: resolveDisplayName(t.transaction_reviews?.[0], t),
     amountMinor: t.amount_minor,
     occurredAtMs: Date.parse(t.occurred_at),
     budgetEligible: t.budget_eligible,
@@ -140,7 +145,13 @@ export default function InsightsScreen() {
   return (
     <ScreenScaffold titleFirst="This" titleSecond="Month" scroll={false} testID="insights">
       <View style={{ flex: 1 }}>
-        <View style={{ flex: 1 }}>
+        {/* Phase 10A.5: same scrollable-content pattern as Settings; the
+          bottom padding is the measured pill clearance. */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: pillNavClearance(insets.bottom) }}
+          testID="insights-scroll"
+        >
           {fresh ? (
             <Card variant="paper" testID="insights-first-month">
               <Text role="body" color="ink">
@@ -215,7 +226,7 @@ export default function InsightsScreen() {
               Back home
             </Text>
           </Link>
-        </View>
+        </ScrollView>
         <PillNav
           active="insights"
           onNavigate={(route) => router.push(PILL_ROUTES[route])}

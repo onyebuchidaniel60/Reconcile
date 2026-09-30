@@ -152,7 +152,13 @@ export function LineChart({
               key={tick.label}
               role="small"
               color={surface === "dark" ? "paper" : "ink"}
-              style={{ opacity: 0.6 }}
+              // Phase 10A.5 (Fix 3): Android Yoga does not shrink row
+              // children by default, so three or four long date labels
+              // ("Sept 15, 2026") pushed past the card edge on narrow
+              // screens while web stayed clean. Shrink from the first
+              // label, ellipsize rather than clip.
+              style={{ opacity: 0.6, flexShrink: 1 }}
+              numberOfLines={1}
             >
               {tick.label}
             </Text>

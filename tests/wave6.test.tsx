@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import { describe, expect, it, jest } from "@jest/globals";
+import { act } from "react-test-renderer";
 import { StyleSheet } from "react-native";
 import { Avatar, avatarInitialForName, avatarTintForName } from "../src/components/Avatar";
 import { BlockingSpinner } from "../src/components/BlockingSpinner";
@@ -225,5 +226,25 @@ describe("Wave 6 Avatar", () => {
       expect(screen.getByLabelText("Adaeze")).toBeTruthy();
       await unmount();
     }
+  });
+
+  it("renders a photo from uri and falls back on load failure (Phase 10A.5)", async () => {
+    const { unmount } = await render(
+      <Avatar displayName="Adaeze" uri="https://example.com/a.jpg" testID="avatar-photo" />,
+    );
+    expect(screen.getByTestId("avatar-photo-image")).toBeTruthy();
+    expect(screen.queryByText("A")).toBeNull();
+    act(() => {
+      screen.getByTestId("avatar-photo-image").props.onError();
+    });
+    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.queryByTestId("avatar-photo-image")).toBeNull();
+    await unmount();
+  });
+
+  it("renders the initial when uri is absent (Phase 10A.5)", async () => {
+    await render(<Avatar displayName="Adaeze" uri={null} testID="avatar-nouri" />);
+    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.queryByTestId("avatar-nouri-image")).toBeNull();
   });
 });

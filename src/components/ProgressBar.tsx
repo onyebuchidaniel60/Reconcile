@@ -10,7 +10,7 @@ import { useMotion } from "../theme/motion";
 import { radius } from "../theme/radius";
 import { PillBadge } from "./PillBadge";
 
-export type ProgressBarVariant = "light" | "ink";
+export type ProgressBarVariant = "light" | "ink" | "over-budget";
 
 interface ProgressBarProps {
   value: number;
@@ -23,8 +23,9 @@ interface ProgressBarProps {
 
 /**
  * Progress bar per design.md §7. Track is `line` at 60% opacity with pill
- * ends; fill is `ink` on light cards and `signal-yellow` on ink cards. A
- * label renders inside a small white pill centered over the filled portion.
+ * ends; fill is `ink` on light cards and `signal-yellow` on ink cards, or
+ * `alert-red` for the over-budget variant (fill capped full, label uncapped).
+ * A label renders inside a small white pill centered over the filled portion.
  * Width animates over the UI duration unless reduced motion is on.
  */
 export function ProgressBar({
@@ -83,7 +84,11 @@ export function ProgressBar({
             height: "100%",
             borderRadius: radius.pill,
             backgroundColor:
-              variant === "light" ? colors.ink : colors.signalYellow,
+              variant === "over-budget"
+                ? colors.alertRed
+                : variant === "light"
+                  ? colors.ink
+                  : colors.signalYellow,
           },
           fillStyle,
         ]}

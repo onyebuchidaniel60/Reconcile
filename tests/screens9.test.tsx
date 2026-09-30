@@ -12,10 +12,17 @@ import {
   getActiveConnection,
   getCategories,
   getCurrentMonthBudget,
+  getProfile,
   getTransaction,
   getTransactions,
   updateBudget,
+  setAvatarUrl,
 } from "../src/lib/db";
+import {
+  pickAvatarImage,
+  removeAvatarObjects,
+  uploadAvatarImage,
+} from "../src/lib/avatar";
 import ActivityScreen from "../app/activity";
 import TransactionDetailScreen from "../app/transaction/[id]";
 import BudgetSetupScreen from "../app/budget-setup";
@@ -65,11 +72,19 @@ jest.mock("../src/lib/db", () => ({
   disconnectConnection: jest.fn(),
   getReviewCount: jest.fn(),
   getPendingReviews: jest.fn(),
+  getProfile: jest.fn(),
+  setAvatarUrl: jest.fn(),
   parseMajorToMinor: (raw: string) => {
     const value = Number.parseFloat(raw.replace(/[,₦\s]/g, ""));
     if (!Number.isFinite(value) || value < 0) throw new Error("Enter a valid non-negative amount.");
     return Math.round(value * 100);
   },
+}));
+
+jest.mock("../src/lib/avatar", () => ({
+  pickAvatarImage: jest.fn(),
+  uploadAvatarImage: jest.fn(),
+  removeAvatarObjects: jest.fn(),
 }));
 
 type MockFn = {
@@ -90,6 +105,11 @@ const mockGetAccounts = getAccounts as unknown as MockFn;
 const mockGetActiveConnection = getActiveConnection as unknown as MockFn;
 const mockGetCategories = getCategories as unknown as MockFn;
 const mockGetCurrentMonthBudget = getCurrentMonthBudget as unknown as MockFn;
+const mockGetProfile = getProfile as unknown as MockFn;
+const mockSetAvatarUrl = setAvatarUrl as unknown as MockFn;
+const mockPickAvatarImage = pickAvatarImage as unknown as MockFn;
+const mockUploadAvatarImage = uploadAvatarImage as unknown as MockFn;
+const mockRemoveAvatarObjects = removeAvatarObjects as unknown as MockFn;
 const mockGetTransaction = getTransaction as unknown as MockFn;
 const mockGetTransactions = getTransactions as unknown as MockFn;
 const mockUpdateBudget = updateBudget as unknown as MockFn;
@@ -129,6 +149,8 @@ beforeEach(() => {
     mockGetAccounts, mockGetTransactions, mockGetTransaction, mockGetCategories,
     mockGetCurrentMonthBudget, mockCreateBudget, mockUpdateBudget, mockConfirmReview,
     mockExcludeReview, mockAskQuestion, mockGetActiveConnection, mockDisconnect,
+    mockGetProfile, mockSetAvatarUrl, mockPickAvatarImage, mockUploadAvatarImage,
+    mockRemoveAvatarObjects,
   ]) {
     M(fn).mockReset();
   }
@@ -151,6 +173,7 @@ beforeEach(() => {
   });
   M(mockAskQuestion).mockResolvedValue({ answer: "You spent ₦72,765.74 on Food.", basis: "based on: Food spend" });
   M(mockGetActiveConnection).mockResolvedValue({ id: "c1" });
+  M(mockGetProfile).mockResolvedValue({ id: "u1", email: "ada@example.com", avatar_url: null });
   M(mockCreateBudget).mockResolvedValue(undefined);
   M(mockUpdateBudget).mockResolvedValue(undefined);
   M(mockConfirmReview).mockResolvedValue(undefined);
@@ -213,12 +236,30 @@ describe("Transaction Detail screen", () => {
     await waitFor(() => expect(mockExcludeReview).toHaveBeenCalledWith("t1"));
   });
 
-  it("shows the error state", async () => {
-    M(mockGetTransaction).mockRejectedValueOnce(new Error("Gone."));
-    await render(<TransactionDetailScreen />);
-    expect(await screen.findByText("Gone.")).toBeTruthy();
+    it("shows the error state", async () => {
+      M(mockGetTransaction).mockRejectedValueOnce(new Error("Gone."));
+      await render(<TransactionDetailScreen />);
+      expect(await screen.findByText("Gone.")).toBeTruthy();
+    });
+
+    it("titles with the user's display name and keeps raw narration (Phase 10A.5, Fix 7)", async () => {
+      M(mockGetTransaction).mockResolvedValue({
+        txn: txn(),
+        review: {
+          status: "reconciled",
+          category_id: "transport",
+          user_note: null,
+          display_name: "Bolt Rides",
+        },
+      });
+      await render(<TransactionDetailScreen />);
+      expect(await screen.findByTestId("detail-merchant")).toBeTruthy();
+      // Title follows the user-set name...
+      expect(screen.getByText("Bolt Rides")).toBeTruthy();
+      // ...while the immutable provider narration is still shown verbatim.
+      expect(screen.getByText("Bolt trip ref 123")).toBeTruthy();
+    });
   });
-});
 
 describe("Budget Setup screen", () => {
   it("saves a new budget via create", async () => {
@@ -310,6 +351,23 @@ describe("Insights screen", () => {
     await render(<InsightsScreen />);
     expect(await screen.findByText("Insights arrive after your first month.")).toBeTruthy();
   });
+
+  it("labels the top merchant with the user's display name (Phase 10A.5, Fix 7)", async () => {
+    M(mockGetTransactions).mockResolvedValue([
+      txn({
+        merchant_name: "Bolt",
+        transaction_reviews: [
+          { status: "reconciled", category_id: "transport", user_note: null, display_name: "Bolt Rides" },
+        ],
+      }),
+      txn({ id: "old", occurred_at: "2026-08-11T09:00:00.000Z" }),
+    ]);
+    await render(<InsightsScreen />);
+    expect(await screen.findByText("Top merchant")).toBeTruthy();
+    expect(
+      screen.getByText("Bolt Rides is your top merchant at ₦4,200.00 this month."),
+    ).toBeTruthy();
+  });
 });
 
 describe("Ask screen", () => {
@@ -355,6 +413,25 @@ describe("Settings screen", () => {
         screen.getByRole("button", { name: label }).props.accessibilityState.selected,
       ).toBe(false);
     }
+  });
+
+  it("shows Change photo without Remove when no photo exists (Phase 10A.5)", async () => {
+    await render(<SettingsScreen />);
+    await screen.findByText("Profile");
+    expect(screen.getByTestId("settings-photo-change")).toBeTruthy();
+    expect(screen.queryByTestId("settings-photo-remove")).toBeNull();
+    expect(screen.queryByTestId("settings-avatar-image")).toBeNull();
+  });
+
+  it("shows Remove and the photo when one exists (Phase 10A.5)", async () => {
+    M(mockGetProfile).mockResolvedValue({
+      id: "u1",
+      email: "ada@example.com",
+      avatar_url: "https://example.com/a.jpg",
+    });
+    await render(<SettingsScreen />);
+    await screen.findByTestId("settings-photo-remove");
+    expect(screen.getByTestId("settings-avatar-image")).toBeTruthy();
   });
 });
 

@@ -229,6 +229,7 @@ screens — separation is achieved via surface contrast and spacing.
 - Fill: Ink on light cards, Signal Yellow on Ink cards.
 - Pill-shaped ends.
 - Optional right-side label (e.g., "50%") in a small white pill over the filled portion.
+- Over-budget variant: when spend exceeds the limit, the fill renders full in Alert Red and the label shows the uncapped percentage (e.g., "121%").
 
 ### Chart primitives
 
@@ -349,6 +350,7 @@ Rules:
 - Ink card: forecast line chart (Signal Yellow).
 - Paper card: category list — each row: tinted icon, category, spent, limit, mini progress bar.
 - Coral used only when a category is over its cap.
+- When total spend exceeds the budget, the overview progress bar uses the Alert Red over-budget fill (bar full, uncapped percentage label).
 
 ### Insights
 - Paired title "This **Month**".

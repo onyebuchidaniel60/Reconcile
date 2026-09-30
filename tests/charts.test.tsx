@@ -225,4 +225,47 @@ describe("Wave 5 charts", () => {
     const chart = screen.getByTestId("bars-a11y");
     expect(chart.props.accessibilityLabel).toMatch(/^Bar chart\./);
   });
+
+  it("axis labels shrink and ellipsize instead of overflowing (Phase 10A.5, Fix 3)", async () => {
+    // Android Yoga does not shrink row children by default; long real
+    // date labels pushed the axis past the card edge on narrow screens.
+    const points = [
+      { x: 1, y: 300 },
+      { x: 10, y: 260 },
+      { x: 20, y: 310 },
+    ];
+    const ticks = [
+      { value: 1, label: "Sept 1, 2026" },
+      { value: 2, label: "Sept 15, 2026" },
+      { value: 3, label: "Sept 30, 2026" },
+    ];
+    const { unmount } = await render(
+      <LineChart points={points} axisTicks={ticks} testID="line-shrink" />,
+    );
+    for (const tick of ticks) {
+      const node = screen.getByText(tick.label);
+      expect(StyleSheet.flatten(node.props.style).flexShrink).toBe(1);
+      expect(node.props.numberOfLines).toBe(1);
+    }
+    await unmount();
+
+    await render(
+      <BarChart
+        bars={[
+          { label: "June", value: 1, fill: "ink" },
+          { label: "July", value: 2, fill: "hatched" },
+          { label: "August", value: 3, fill: "ink" },
+          { label: "September", value: 4, fill: "ink" },
+        ]}
+        axisTicks={[{ value: 0, label: "₦0" }, { value: 100, label: "₦100k" }]}
+        testID="bars-shrink"
+      />,
+    );
+    // x-axis month labels and y-gutter value labels both shrink and clip.
+    for (const label of ["June", "July", "August", "September", "₦0", "₦100k"]) {
+      const node = screen.getByText(label);
+      expect(StyleSheet.flatten(node.props.style).flexShrink).toBe(1);
+      expect(node.props.numberOfLines).toBe(1);
+    }
+  });
 });

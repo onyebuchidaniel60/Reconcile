@@ -150,10 +150,19 @@ export function BarChart({
               justifyContent: "space-between",
               marginRight: spacing.xs,
               height: height - 24,
+              // Phase 10A.5 (Fix 3): the gutter is sized by its longest
+              // label and must be allowed to give width back, or the
+              // flex:1 plot beside it overflows the card on Android.
+              flexShrink: 1,
             }}
           >
             {gutterTicks.map((tick) => (
-              <Text key={tick.label} role="small" style={{ opacity: 0.6 }}>
+              <Text
+                key={tick.label}
+                role="small"
+                style={{ opacity: 0.6, flexShrink: 1 }}
+                numberOfLines={1}
+              >
                 {tick.label}
               </Text>
             ))}
@@ -191,7 +200,14 @@ export function BarChart({
             }}
           >
             {bars.map((bar) => (
-              <Text key={bar.label} role="small" style={{ opacity: 0.6 }}>
+              // Phase 10A.5 (Fix 3): same Yoga shrink rule as the y-gutter
+              // — month labels ellipsize instead of running off the card.
+              <Text
+                key={bar.label}
+                role="small"
+                style={{ opacity: 0.6, flexShrink: 1 }}
+                numberOfLines={1}
+              >
                 {bar.label}
               </Text>
             ))}
