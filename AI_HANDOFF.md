@@ -1053,6 +1053,196 @@
 - SKILL_FRONTEND_DESIGN.md still untouched (§10 evolution log still the
   template). Phase 10B close NOT started; Phase 11 NOT started.
 
+## Phase 10B.5 checkpoint (data consistency + month toggle)
+- Fix commit: `53d4c0e fix: unify home and budget month spend; wire home
+  month selector (Phase 10B.5)` (6 files, +564/-44). Second commit (this
+  entry): handoff plus 10 evidence screenshots.
+- Scope: the two operator-reported data bugs. No source-of-truth doc touched
+  at all this phase (`git diff` for every doc in the source-of-truth set is
+  unchanged since Phase 10B), no new primitives, no organisms, no `supabase/`
+  change, no schema or migration.
+
+### Fix A — Home expenses must match Budget expenses. INVESTIGATED, FIXED, VERIFIED.
+The two definitions as they stood before this phase:
+
+| | Home hero "Expenses" | Budget "Spent" |
+|---|---|---|
+| Call site | `app/home.tsx` `setExpenses(spend.expenseMinor)` | `app/budget.tsx` `const spent = Math.max(spend.netMinor, 0)` |
+| Engine | `periodSpend(rows, monthStart, monthEnd)` | `periodSpend(rows, monthStart, monthEnd)` |
+| Field used | `.expenseMinor` — **gross** | `.netMinor` — **net** |
+| Refunds | **ignored**, so a refunded ₦20k still read as spent | **subtracted** |
+| Date range | local calendar month, from a private `monthBounds(now)` in home.tsx | `budget.period_start` … `budget.period_end` via `Date.parse` (UTC midnight) |
+| `budget_eligible` | filters it out | filters it out |
+| `internal_transfer` | never counted (no `expense`/`refund` match) | never counted |
+
+Root cause: same engine helper, two different fields. `.expenseMinor` is the
+gross figure; `.netMinor` subtracts refunds. Any month containing a refund
+made Home read higher than Budget by exactly the refund total.
+
+A second, quieter divergence: Home's window came from a hand-rolled local
+`monthBounds`, Budget's from `Date.parse("2026-09-01")`, which is **UTC**
+midnight. In UTC+1 those are different instants, so a transaction near a
+month boundary could land in one window and not the other.
+
+**Budget's definition is the correct one** — a refund is money that came back
+and must not still read as spent — so per instruction the definition was not
+changed, only deduplicated.
+
+- New `getMonthlySpend(txns, month)` in `src/lib/txn.ts`: the single
+  definition. Returns `{ netMinor, expenseMinor, refundMinor, incomeMinor,
+  startMs, endMs }`. Rules identical to the Budget engine — only
+  `budget_eligible` rows count, `expense` adds, `refund` subtracts,
+  internal/external transfers are never spend, income is summed separately
+  and never reduced by refunds, and the window is half-open `[start, end)`
+  so a boundary instant cannot land in two months.
+- Both screens now call it. Home reads `spend.netMinor` for the hero and the
+  budget bar. Budget derives the month from `budget.period_start` via a new
+  `monthFromIso` (year/month only, no UTC drift) and calls the same helper,
+  so the two windows are identical by construction rather than by
+  coincidence. The Budget trend points and category caps still use
+  `periodSpend` over that same window — unchanged, and not part of the
+  reported bug.
+- The Donut needed no separate fix: it was already driven by the same
+  `income`/`expenses` props as the legend, so unifying those props unified
+  the chart too. Verified: switching months re-renders the donut.
+- Supporting helpers added alongside, all in `src/lib/txn.ts`:
+  `monthBoundsFor` (local half-open calendar month), `monthOffset` (back whole
+  calendar months, **day clamped to the target month's length** — naive
+  `new Date(y, m - back, d)` silently rolls Jan 31 back to Mar 2/3, which
+  would have shifted the period label by a month on the 29th–31st), and
+  `recentMonths`.
+- Numeric proof on the deployed bundle, identical at 375×812 and 1280×800,
+  with a ₦9,000,000 budget and real demo spend: Home hero "Expenses"
+  **₦200,202.96**, Home Budget "Spent" row **₦200,202.96**, Budget trend
+  hero **₦200,202.96**. All three the same number. Screenshots
+  `phase10b5-home-*.png` and `phase10b5-budget-*.png`.
+- Tests: a fixture spanning expense + income + refund + internal transfer +
+  external transfer + an out-of-month row returns the expected net;
+  ineligible rows excluded from spend but their income kept; refunds beyond
+  expenses floor at 0; the half-open window never double-counts a boundary;
+  and an explicit **parity test** asserting `getMonthlySpend` equals
+  `periodSpend` on the same rows and window.
+
+### Fix B — Home month toggle. WAS A STUB, NOW WIRED, VERIFIED.
+- Before: `HeroSummaryCard` has had an optional `onPressPeriod` prop since
+  Phase 7 and renders its period label as a `Pressable` with
+  `minHeight: 44`, but `app/home.tsx` **never passed the prop**, so
+  `onPress` was `undefined` and the control was inert. Confirmed by reading
+  the caller, not by inference. Home also hard-coded `now` everywhere, so
+  there was no selected-month state at all.
+- Now: `monthBack` state (an offset, not a `Date`, so the default stays
+  live). Tapping the period label toggles an **inline** month picker under
+  the hero card — six `Chip`s, current month plus five prior, current one
+  selected, plus a close `IconButton`. Inline rather than a modal because
+  the phase may not add a primitive, and it keeps the donut visible while
+  comparing months. Selecting a month re-runs the fetch effect and
+  recomputes the hero (income, expenses, donut total), the budget bar, and
+  the recent-activity list, which is now filtered to the selected month
+  rather than a newest-first slice unrelated to the period.
+- One deliberate behaviour change, stated because it is a judgement call:
+  the **Budget Overview card is hidden on a prior month**. Budgets are
+  per-calendar-month rows, and only the current month's budget is fetched,
+  so showing it would compare the selected month's spend against the
+  current month's limit — a worse version of the very inconsistency this
+  phase exists to remove.
+- Demo seed (B2): **verified, not changed.** Ran the real
+  `buildDemoDataset` builder: 55 transactions spanning **2–3 distinct
+  calendar months** at every point in the month (min 2), and the prior month
+  contains expense, income and refund rows. The instruction was to extend the
+  seed only if it did **not** already span two months, so no seed change was
+  made. One property worth knowing: on the 1st or 2nd of a month the current
+  month holds only 1–4 rows (a 60-day trailing window mostly lands in the
+  prior month), so a prior month will look fuller than the current one early
+  in the month. That is the existing seed's shape, not a regression.
+- Tests: Home with a prior month selected renders that month's figures;
+  pressing the period label opens the picker; selecting month 1 changes the
+  legend figures and the period label and closes the picker; returning to
+  month 0 restores the original figures exactly; and the budget card is
+  absent on a prior month.
+- Web walk on the deployed bundle, both viewports: period label
+  "September 2026" → picker with 6 months → August 2026 selected, expenses
+  move ₦200,202.96 → **₦275,031.20**, income ₦570,000.00 → ₦450,000.00,
+  donut total ₦770,202.96 → **₦725,031.20**, recent rows re-dated to Aug 31,
+  budget card gone. Returning to the current month restored
+  ₦200,202.96 exactly. Screenshots `phase10b5-month-picker-*.png`,
+  `phase10b5-home-prior-month-*.png`, `phase10b5-home-back-to-current-*.png`.
+
+### Checks on the fix tree
+- `npx tsc --noEmit` → 0. `npx eslint .` → 0 (an `exhaustive-deps` warning
+  on the month-choices memo was resolved by dropping the unnecessary
+  `useMemo` entirely rather than suppressing the rule).
+- `npm test` → 20 suites passed, 1 skipped (live); 206 passed, 2
+  live-skipped; `check:tokens` 0 violations; `native-safety` green.
+  (+13 tests this phase: 6 helper/parity, 4 month helpers, 3 Home, 1 Budget
+  parity through the real screen.)
+- `npx expo export -p web` → success, 20 static routes.
+- Two test-authoring corrections worth recording, both found by running the
+  tests rather than by inspection: the `ChartLegend` renders label and value
+  as separate children of one `Text`, so `getByText("Expenses ₦x")` can
+  never match (assert by testID and read concatenated text instead); and the
+  fixtures use `amount_minor`, so ₦400,000 is `"₦4,000.00"`, not
+  `"₦400,000.00"`. I asserted the wrong string twice before reading the
+  actual output — neither was a product bug.
+
+### Deploy and web regression
+- Pushed `53d4c0e`; Vercel READY (`reconcile-r2g5ucj5w-uhhh2.vercel.app`).
+  `curl -sIL https://reconcile-uhhh2.vercel.app` → 200. Deployed bundle
+  carries the new markers (`home-month-picker`, `Summary period`) and still
+  carries every prior phase's (`Change photo`, `Edit budget`, `Name this
+  transaction`, `activity-rename`, `detail-rename-open`) — no regression.
+  Exactly one Supabase-URL match; the single `sb_secret_` hit is supabase-js's
+  prefix-check function body, not a value. No secret in the bundle.
+- Agent-as-user web pass (Playwright, headless Chromium, throwaway user via
+  the Supabase admin API, reduced motion on) at **375×812 and 1280×800**:
+  sign-in → demo sync → budget create → Home/Budget comparison → month
+  toggle walk → Activity → Review → Settings → Insights.
+  **Zero console errors. Zero 4xx/5xx. Zero overflowing elements, zero
+  unlabeled icon buttons, zero sub-44px targets** on every audited screen
+  (Home, Budget, picker, prior month, Activity, Review, Settings, Insights).
+  Only network entries are `net::ERR_ABORTED` on a `transaction_reviews`
+  count — the screen-change abort of an in-flight request, present in every
+  prior phase too.
+- Prior-phase regressions re-confirmed in the same pass: Activity rename
+  pencil present, Review name field visible above the fold and above the
+  chips, Settings Change photo present with the 76px pill clearance
+  unchanged (0 inset + 60 pill + 16), Insights renders.
+
+### Preview APK
+- EAS build (NOT a dev client), profile `preview`, SDK 57,
+  `com.onyebuchidaniel.reconcile`, version 0.1.0 (1), INTERNAL, FINISHED.
+  Submitted with `EAS_SKIP_AUTO_FINGERPRINT=1`; credentials and profile
+  unchanged. Queue was unusually long (~67 min IN_QUEUE, then ~12 min build).
+- Build:
+  `https://expo.dev/accounts/buchi208/projects/reconcile/builds/56c161dd-d805-46e7-b3b0-ad76eb7b0830`
+- APK:
+  `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk`
+  (verified reachable, HTTP 200, 110,402,201 bytes)
+- **FLAGGED, operator should confirm:** this build's `gitCommitHash` and
+  `gitCommitMessage` came back **empty** from the EAS API — the submit ran
+  from a background job that did not carry the git context, and
+  `EAS_NO_VCS` was set in the environment at submit time. The uploaded
+  archive is still the correct code: the build started 15:53, the Phase
+  10B.5 commit `53d4c0e` landed 15:39, and `git diff 53d4c0e..HEAD` is empty,
+  so nothing changed between the commit and the build. The build is
+  trustworthy by tree equality, **not** by a stamped hash. Worth re-running
+  the build in the foreground if a hash-stamped artifact is wanted.
+
+### Needs a real device
+- **Fix A** — the three figures match numerically in a browser against real
+  demo data; confirm the Home and Budget numbers read identically on device.
+- **Fix B** — the toggle works in a browser, but only a device confirms the
+  picker sits comfortably in a thumb reach under the hero card and that the
+  inline list does not crowd the yellow card on a small screen.
+- **Fix B (seed timing)** — early in a calendar month the current month will
+  have very few demo rows, so a prior month can look fuller. Not a defect,
+  but the operator may see it on the 1st or 2nd.
+
+- Explicit statement: "Phase 10B close pending operator re-verification at
+  `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk`.
+  SKILL_FRONTEND_DESIGN.md rewrite remains gated on that verification."
+- SKILL_FRONTEND_DESIGN.md still untouched (§10 evolution log still the
+  template). Phase 10B close NOT started; Phase 11 NOT started.
+
 ## Project
 Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank transaction reconciliation, budgeting and read-only financial insights.
 
