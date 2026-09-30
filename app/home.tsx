@@ -1,8 +1,7 @@
 import { Link, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
-import { CreditCard, LayoutGrid } from "lucide-react-native";
-import { periodSpend } from "../supabase/functions/_shared/finance";
+import { CreditCard, LayoutGrid, X } from "lucide-react-native";
 import {
   getAccounts,
   getCategories,
@@ -21,12 +20,16 @@ import {
   formatBoundLabel,
   formatPeriodLabel,
   formatRowDate,
-  periodIncome,
+  getMonthlySpend,
+  monthBoundsFor,
+  monthOffset,
+  recentMonths,
   resolveDisplayName,
 } from "../src/lib/txn";
 import { Avatar } from "../src/components/Avatar";
 import { BudgetOverviewCard } from "../src/components/organisms/BudgetOverviewCard";
 import { Button } from "../src/components/Button";
+import { Chip } from "../src/components/Chip";
 import { DarkScreenScaffold } from "../src/components/DarkScreenScaffold";
 import { EmptyState } from "../src/components/EmptyState";
 import { ErrorState } from "../src/components/ErrorState";
@@ -39,13 +42,8 @@ import { Text } from "../src/components/Text";
 import { TransactionRow } from "../src/components/TransactionRow";
 import { select } from "../src/lib/haptics";
 import { colors } from "../src/theme/colors";
+import { radius } from "../src/theme/radius";
 import { spacing } from "../src/theme/spacing";
-
-function monthBounds(now: Date): { startMs: number; endMs: number } {
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
-  return { startMs: start, endMs: end };
-}
 
 function firstNameOf(email: string | undefined): string {
   const local = (email ?? "").split("@")[0];
@@ -60,10 +58,18 @@ const PILL_ROUTES: Record<PillRoute, "/home" | "/activity" | "/budget" | "/insig
   insights: "/insights",
 };
 
+/** How many calendar months the summary period selector offers. */
+const MONTH_CHOICES = 6;
+
 export default function HomeScreen() {
   const { session } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  // Phase 10B.5 (Fix B): how many months back the summary is showing. Held
+  // as an offset (not a Date) so the default stays live rather than
+  // freezing at mount, and 0 always means "this month".
+  const [monthBack, setMonthBack] = useState(0);
+  const [pickingMonth, setPickingMonth] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasAccounts, setHasAccounts] = useState(false);
   const [income, setIncome] = useState(0);
@@ -87,6 +93,15 @@ export default function HomeScreen() {
     return { accounts, txns, count, budget, cats, profile };
   }, []);
 
+  // The month currently being summarised, derived from `monthBack`.
+  const selectedMonth = useCallback(
+    () => monthOffset(new Date(), monthBack),
+    [monthBack],
+  );
+  // The six selectable months. Built fresh each render — it is six Date
+  // objects and the picker is open only while the user is choosing.
+  const monthChoices = recentMonths(new Date(), MONTH_CHOICES);
+
   const applyHomeData = useCallback(
     (
       accounts: { id: string }[],
@@ -95,32 +110,32 @@ export default function HomeScreen() {
       budget: Budget | null,
       cats: Category[],
       profile: { avatar_url: string | null } | null,
+      month: Date,
     ) => {
       setHasAccounts(accounts.length > 0);
-      const now = new Date();
-      const { startMs, endMs } = monthBounds(now);
-      const spend = periodSpend(
-        txns.map((t) => ({
-          semanticType: t.semantic_type as
-            | "income"
-            | "expense"
-            | "external_transfer"
-            | "internal_transfer"
-            | "refund"
-            | "unknown",
-          amountMinor: t.amount_minor,
-          occurredAtMs: Date.parse(t.occurred_at),
-          budgetEligible: t.budget_eligible,
-        })),
-        startMs,
-        endMs,
-      );
-      setIncome(periodIncome(txns, startMs, endMs));
-      setExpenses(spend.expenseMinor);
+      // Phase 10B.5 (Fix A): one shared definition of monthly spend. Home
+      // previously used the gross figure (refunds ignored) while Budget used
+      // the net one, so the same month showed two different "Expenses"
+      // numbers. `spend.netMinor` is the Budget reading, which is correct.
+      const spend = getMonthlySpend(txns, month);
+      setIncome(spend.incomeMinor);
+      setExpenses(spend.netMinor);
       setBudgetLimit(budget ? budget.total_limit_minor : null);
       setBudgetCurrency(budget?.currency ?? txns[0]?.currency ?? "NGN");
       setReviewCount(count);
-      setRecent(txns.slice(0, 5));
+      // Phase 10B.5 (Fix B): the recent list follows the selected month, so
+      // switching months shows that period's activity rather than an
+      // unrelated newest-first slice.
+      const from = spend.startMs;
+      const until = spend.endMs;
+      setRecent(
+        txns
+          .filter((t) => {
+            const at = Date.parse(t.occurred_at);
+            return at >= from && at < until;
+          })
+          .slice(0, 5),
+      );
       setCategories(cats);
       setAvatarUrl(profile?.avatar_url ?? null);
     },
@@ -132,21 +147,24 @@ export default function HomeScreen() {
     setError(null);
     try {
       const { accounts, txns, count, budget, cats, profile } = await fetchData();
-      applyHomeData(accounts, txns, count, budget, cats, profile);
+      applyHomeData(accounts, txns, count, budget, cats, profile, selectedMonth());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load home.");
     } finally {
       setLoading(false);
     }
-  }, [fetchData, applyHomeData]);
+  }, [fetchData, applyHomeData, selectedMonth]);
 
+  // Re-runs whenever the selected month changes, so switching months
+  // recomputes the hero, the budget bar, and the recent list for that
+  // period (Phase 10B.5, Fix B).
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const { accounts, txns, count, budget, cats, profile } = await fetchData();
         if (!active) return;
-        applyHomeData(accounts, txns, count, budget, cats, profile);
+        applyHomeData(accounts, txns, count, budget, cats, profile, selectedMonth());
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : "Could not load home.");
@@ -157,13 +175,20 @@ export default function HomeScreen() {
     return () => {
       active = false;
     };
-  }, [fetchData, applyHomeData]);
+  }, [fetchData, applyHomeData, selectedMonth]);
 
   const name = firstNameOf(session?.user.email);
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const shown = selectedMonth();
+  const { startMs: periodStartMs, endMs: periodEndMs } = monthBoundsFor(shown);
+  const periodStart = new Date(periodStartMs);
+  // Exclusive end bound minus 1ms so the label reads the last day in the
+  // month rather than the first day of the next.
+  const periodEnd = new Date(periodEndMs - 1);
   const spent = Math.max(expenses, 0);
+  // A budget exists per calendar month; only show its card when the summary
+  // is showing that same month, otherwise the bar would compare this
+  // month's spend against a different month's limit.
+  const isCurrentMonth = monthBack === 0;
   const progress = budgetLimit && budgetLimit > 0 ? spent / budgetLimit : 0;
 
   if (loading) {
@@ -270,15 +295,72 @@ export default function HomeScreen() {
               </Text>
               <View style={{ marginTop: spacing.md }}>
                 <HeroSummaryCard
-                  period={formatPeriodLabel(now)}
+                  period={formatPeriodLabel(shown)}
                   total={income + expenses}
                   income={income}
                   expenses={expenses}
                   currency={budgetCurrency}
+                  onPressPeriod={() => setPickingMonth((open) => !open)}
                   testID="home-hero"
                 />
               </View>
-              {budgetLimit !== null ? (
+              {/* Phase 10B.5 (Fix B): the month picker. Inline under the
+                hero card rather than in a modal — no new primitive, and it
+                keeps the chart visible while the user compares months. */}
+              {pickingMonth ? (
+                <View
+                  style={{
+                    marginTop: spacing.md,
+                    padding: spacing.md,
+                    borderRadius: radius.compact,
+                    backgroundColor: colors.paper,
+                  }}
+                  testID="home-month-picker"
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text role="small" color="ink" style={{ fontWeight: "600" }}>
+                      Summary period
+                    </Text>
+                    <IconButton
+                      accessibilityLabel="Close month picker"
+                      onPress={() => setPickingMonth(false)}
+                      tone="light"
+                      testID="home-month-close"
+                    >
+                      <X size={20} color={colors.ink} strokeWidth={1.5} />
+                    </IconButton>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      marginTop: spacing.sm,
+                    }}
+                  >
+                    {monthChoices.map((choice, index) => (
+                      <View key={choice.toISOString()} style={{ margin: spacing.xs }}>
+                        <Chip
+                          label={formatPeriodLabel(choice)}
+                          selected={index === monthBack}
+                          accessibilityLabel={`Show ${formatPeriodLabel(choice)}`}
+                          onPress={() => {
+                            setMonthBack(index);
+                            setPickingMonth(false);
+                          }}
+                          testID={`home-month-${index}`}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {budgetLimit !== null && isCurrentMonth ? (
                 <View style={{ marginTop: spacing.md }}>
                   <BudgetOverviewCard
                     spent={spent}

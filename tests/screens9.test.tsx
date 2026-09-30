@@ -118,6 +118,25 @@ const mockGetTransactions = getTransactions as unknown as MockFn;
 const mockUpdateBudget = updateBudget as unknown as MockFn;
 const M = (fn: unknown): MockFn => fn as unknown as MockFn;
 
+/** Concatenated text content of a rendered node, in document order. */
+function collectNodeText(node: unknown): string {
+  let out = "";
+  const walk = (n: unknown): void => {
+    if (n === null || n === undefined || n === false) return;
+    if (typeof n === "string" || typeof n === "number") {
+      out += String(n);
+      return;
+    }
+    if (Array.isArray(n)) {
+      n.forEach(walk);
+      return;
+    }
+    if (typeof n === "object") walk((n as { children?: unknown }).children);
+  };
+  walk(node);
+  return out;
+}
+
 // Screen renders compile many modules on first mount; allow headroom under
 // parallel load so the suite is deterministic on saturated machines.
 jest.setTimeout(20000);
@@ -417,6 +436,36 @@ describe("Budget screen", () => {
     M(mockGetCurrentMonthBudget).mockResolvedValue({ budget: null, caps: [] });
     await render(<BudgetScreen />);
     expect(await screen.findByText("No budget yet. Set one up to track spending.")).toBeTruthy();
+  });
+
+  it("reports month spend net of refunds (Phase 10B.5, Fix A)", async () => {
+    // The shared helper's contract, observed through the real Budget screen:
+    // expenses minus eligible refunds, ineligible rows and internal
+    // transfers excluded. This is the figure Home's hero must match.
+    const now = new Date();
+    const inMonth = new Date(now.getFullYear(), now.getMonth(), 10).toISOString();
+    M(mockGetTransactions).mockResolvedValue([
+      txn({ id: "e1", amount_minor: 420000, occurred_at: inMonth }),
+      txn({
+        id: "r1",
+        amount_minor: 20000,
+        semantic_type: "refund",
+        direction: "credit",
+        occurred_at: inMonth,
+      }),
+      txn({ id: "x1", amount_minor: 9000000, budget_eligible: false, occurred_at: inMonth }),
+      txn({
+        id: "t1x",
+        amount_minor: 5000000,
+        semantic_type: "internal_transfer",
+        occurred_at: inMonth,
+      }),
+    ]);
+    await render(<BudgetScreen />);
+    // Net = 420000 - 20000 = 400000 minor units. The trend card's hero
+    // amount is `spent`, so it carries the shared figure directly.
+    const trend = await screen.findByTestId("budget-trend");
+    expect(collectNodeText(trend)).toContain("₦4,000.00");
   });
 
   it("renders statically under reduced motion", async () => {

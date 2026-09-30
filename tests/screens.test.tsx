@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import type { ReactNode } from "react";
 import * as motion from "../src/theme/motion";
-import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, monthSampleDays, periodIncome, resolveDisplayName } from "../src/lib/txn";
+import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, monthOffset, monthSampleDays, periodIncome, resolveDisplayName } from "../src/lib/txn";
 import {
   confirmReview,
   connectDemo,
@@ -25,6 +25,25 @@ import SignInScreen from "../app/signin";
 import DemoScreen from "../app/demo";
 import HomeScreen from "../app/home";
 import ReviewScreen from "../app/review";
+
+/** Concatenated text content of a rendered node, in document order. */
+function collectText(node: unknown): string {
+  let out = "";
+  const walk = (n: unknown): void => {
+    if (n === null || n === undefined || n === false) return;
+    if (typeof n === "string" || typeof n === "number") {
+      out += String(n);
+      return;
+    }
+    if (Array.isArray(n)) {
+      n.forEach(walk);
+      return;
+    }
+    if (typeof n === "object") walk((n as { children?: unknown }).children);
+  };
+  walk(node);
+  return out;
+}
 
 /**
  * Document order of a set of testIDs within a rendered tree, used to assert
@@ -344,6 +363,99 @@ describe("Home screen", () => {
     await render(<HomeScreen />);
     await screen.findByText("Hey, Adaeze");
     expect(screen.getByTestId("home-avatar-image")).toBeTruthy();
+  });
+
+  // ---- Phase 10B.5, Fix A: Home "Expenses" == Budget "Spent" ----
+  it("shows the same monthly spend Budget reports (Phase 10B.5, Fix A)", async () => {
+    mockSessionEmail = "adaeze@example.com";
+    // A fixture with an expense, a refund, an ineligible row and a
+    // transfer, all inside the current month. Net = 420000 - 20000.
+    mockGetTransactions.mockResolvedValue([
+      txn(),
+      txn({
+        id: "t-refund",
+        amount_minor: 20000,
+        semantic_type: "refund",
+        direction: "credit",
+      }),
+      txn({ id: "t-skip", amount_minor: 9000000, budget_eligible: false }),
+      txn({
+        id: "t-transfer",
+        amount_minor: 5000000,
+        semantic_type: "internal_transfer",
+      }),
+    ]);
+    await render(<HomeScreen />);
+    await screen.findByText("Hey, Adaeze");
+    // 420000 - 20000 = 400000 minor units.
+    const NET = "₦4,000.00";
+    // The Budget Overview "Spent" row carries the figure directly.
+    expect(screen.getByTestId("home-budget-spent").props.children).toBe(NET);
+    // The hero legend reports the SAME number. The legend renders label and
+    // value as separate children in one Text, so read it by testID.
+    const legend = collectText(screen.getByTestId("home-hero-legend"));
+    expect(legend).toContain("Expenses");
+    expect(legend).toContain(NET);
+  });
+
+  // ---- Phase 10B.5, Fix B: the month selector ----
+  it("switches the summary to a prior month and back (Phase 10B.5, Fix B)", async () => {
+    mockSessionEmail = "adaeze@example.com";
+    const currentMonthSpend = new Date(new Date().getFullYear(), new Date().getMonth(), 10);
+    const priorMonthSpend = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 10);
+    mockGetTransactions.mockResolvedValue([
+      txn({ amount_minor: 420000, occurred_at: currentMonthSpend.toISOString() }),
+      txn({ id: "t-prior", amount_minor: 111000, occurred_at: priorMonthSpend.toISOString() }),
+    ]);
+    await render(<HomeScreen />);
+    await screen.findByText("Hey, Adaeze");
+    const nowLabel = formatPeriodLabel(new Date());
+    expect(screen.getByText(nowLabel)).toBeTruthy();
+    // Current month only: 420000 minor units. The prior month's row is
+    // excluded from the hero for this month.
+    expect(collectText(screen.getByTestId("home-hero-legend"))).toContain(
+      "₦4,200.00",
+    );
+
+    // The period label is now a working control.
+    await fireEvent.press(screen.getByTestId("home-hero-period"));
+    expect(screen.getByTestId("home-month-picker")).toBeTruthy();
+
+    await fireEvent.press(screen.getByTestId("home-month-1"));
+    await waitFor(() =>
+      expect(collectText(screen.getByTestId("home-hero-legend"))).toContain(
+        "₦1,110.00",
+      ),
+    );
+    expect(
+      screen.getByText(formatPeriodLabel(monthOffset(new Date(), 1))),
+    ).toBeTruthy();
+    // The picker closes on selection.
+    expect(screen.queryByTestId("home-month-picker")).toBeNull();
+    // The recent list follows the month too.
+    expect(screen.getByText("Bolt")).toBeTruthy();
+
+    // Back to the current month restores the original figures.
+    await fireEvent.press(screen.getByTestId("home-hero-period"));
+    await fireEvent.press(screen.getByTestId("home-month-0"));
+    await waitFor(() =>
+      expect(collectText(screen.getByTestId("home-hero-legend"))).toContain(
+        "₦4,200.00",
+      ),
+    );
+    expect(screen.getByText(nowLabel)).toBeTruthy();
+  });
+
+  it("hides the budget card on a prior month (Phase 10B.5, Fix B)", async () => {
+    mockSessionEmail = "adaeze@example.com";
+    await render(<HomeScreen />);
+    await screen.findByText("Hey, Adaeze");
+    expect(screen.getByTestId("home-budget")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("home-hero-period"));
+    await fireEvent.press(screen.getByTestId("home-month-1"));
+    await waitFor(() =>
+      expect(screen.queryByTestId("home-budget")).toBeNull(),
+    );
   });
 });
 

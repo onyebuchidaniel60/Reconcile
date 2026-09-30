@@ -139,6 +139,113 @@ export function periodIncome(
   return income;
 }
 
+/** Local calendar-month bounds for a Date: [first day, first of next). */
+export function monthBoundsFor(now: Date): { startMs: number; endMs: number } {
+  return {
+    startMs: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
+    endMs: new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime(),
+  };
+}
+
+/**
+ * Subtract `back` calendar months, clamping the day to the target month's
+ * length so Jan 31 minus one month is Feb 28/29, never Mar 2/3. Naive
+ * `new Date(y, m - back, d)` silently rolls over, which would shift the
+ * period label by a month on the 29th–31st.
+ */
+export function monthOffset(now: Date, back: number): Date {
+  const targetMonth = now.getMonth() - back;
+  const lastDay = new Date(now.getFullYear(), targetMonth + 1, 0).getDate();
+  return new Date(
+    now.getFullYear(),
+    targetMonth,
+    Math.min(now.getDate(), lastDay),
+  );
+}
+
+/** The last `count` calendar months, newest first. */
+export function recentMonths(now: Date, count: number): Date[] {
+  return Array.from({ length: count }, (_, i) => monthOffset(now, i));
+}
+
+/**
+ * "2026-09-01" → a local Date in that month. Budgets store `period_start`
+ * as an ISO date string; parsing it with `Date.parse` yields UTC midnight,
+ * which is the wrong instant in UTC+X and was one source of the Home/Budget
+ * mismatch. Only the year and month are read.
+ */
+export function monthFromIso(iso: string): Date {
+  const [year, month] = iso.split("-").map(Number);
+  if (!year || !month) return new Date();
+  return new Date(year, month - 1, 1);
+}
+
+export interface MonthlySpend {
+  /** Budget-eligible expenses only, refunds subtracted. Never negative. */
+  netMinor: number;
+  /** Eligible expenses before refunds — the "gross" figure. */
+  expenseMinor: number;
+  /** Eligible refunds in the window. */
+  refundMinor: number;
+  /** Month income, regardless of budget eligibility. */
+  incomeMinor: number;
+  startMs: number;
+  endMs: number;
+}
+
+/**
+ * THE definition of "money spent in a month" (Phase 10B.5, Fix A).
+ *
+ * Home's hero card and the Budget screen previously computed this
+ * separately and disagreed: Home used `periodSpend(...).expenseMinor`
+ * (gross, refunds ignored) while Budget used `.netMinor` (refunds
+ * subtracted). Budget's reading is the correct one — a refund is money that
+ * came back and must not still count as spent — so this helper adopts it
+ * and both screens now call it. No financial rule changed; one definition
+ * is now shared instead of two.
+ *
+ * Rules, unchanged from the Budget engine:
+ *  - only `budget_eligible` rows count;
+ *  - `expense` adds, `refund` subtracts;
+ *  - `internal_transfer` and `external_transfer` are never spend (the
+ *    transfer pair cannot double-count);
+ *  - income is summed separately and never reduced by refunds;
+ *  - the window is half-open, [start, end), so boundary instants cannot
+ *    land in two months.
+ *
+ * `month` is any date inside the wanted month; only its year/month are read.
+ */
+export function getMonthlySpend(
+  txns: Transaction[],
+  month: Date,
+): MonthlySpend {
+  const { startMs, endMs } = monthBoundsFor(month);
+  let expenseMinor = 0;
+  let refundMinor = 0;
+  let incomeMinor = 0;
+  for (const t of txns) {
+    const at = Date.parse(t.occurred_at);
+    if (at < startMs || at >= endMs) continue;
+    if (t.semantic_type === "income") {
+      // Income ignores budget eligibility by design: eligibility governs
+      // spend, not inflow.
+      incomeMinor += t.amount_minor;
+      continue;
+    }
+    if (!t.budget_eligible) continue;
+    if (t.semantic_type === "expense") expenseMinor += t.amount_minor;
+    else if (t.semantic_type === "refund") refundMinor += t.amount_minor;
+  }
+  return {
+    netMinor: Math.max(expenseMinor - refundMinor, 0),
+    expenseMinor,
+    refundMinor,
+    incomeMinor,
+    startMs,
+    endMs,
+  };
+}
+
 /** Current month label for hero cards, e.g. "September 2026". */
 export function formatPeriodLabel(now: Date): string {
   return `${MONTHS[now.getMonth()]} ${now.getFullYear()}`;

@@ -28,6 +28,8 @@ import {
 import {
   formatBoundLabel,
   formatMonthAbbrev,
+  getMonthlySpend,
+  monthFromIso,
   monthSampleDays,
   tintForLabel,
 } from "../src/lib/txn";
@@ -181,10 +183,15 @@ export default function BudgetScreen() {
   const callout = `${lastDelta < 0 ? "-" : "+"}${formatCompact(Math.abs(lastDelta))}`;
 
   // Month spend, trend points (weekly cumulative), forecast message.
-  const monthStart = Date.parse(budget.period_start);
-  const monthEnd = Date.parse(budget.period_end);
-  const spend = periodSpend(rows, monthStart, monthEnd);
-  const spent = Math.max(spend.netMinor, 0);
+  // Phase 10B.5 (Fix A): the headline figure now comes from the shared
+  // `getMonthlySpend`, the same helper Home uses. A monthly budget's period
+  // IS the calendar month, so the month is derived from `period_start` and
+  // both screens compute identical windows by construction.
+  const budgetMonth = monthFromIso(budget.period_start);
+  const spend = getMonthlySpend(txns, budgetMonth);
+  const monthStart = spend.startMs;
+  const monthEnd = spend.endMs;
+  const spent = spend.netMinor;
   const sampleDays = monthSampleDays(budget.period_start);
   const points = sampleDays.map((day) => {
     const at = new Date(now.getFullYear(), now.getMonth(), day).getTime();
