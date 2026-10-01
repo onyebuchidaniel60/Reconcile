@@ -21,13 +21,15 @@ import {
 import {
   disconnectConnection,
   getAccounts,
-  getActiveConnection,
+  getCurrentConnection,
   getProfile,
+  needsReauth,
   setAvatarUrl,
   type BankAccount,
   type UserProfile,
 } from "../src/lib/db";
 import { useSession } from "../src/lib/session";
+import { MONO_ENABLED } from "../src/lib/flags";
 import { colors } from "../src/theme/colors";
 import { radius } from "../src/theme/radius";
 import { spacing } from "../src/theme/spacing";
@@ -104,13 +106,16 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [reauthRequired, setReauthRequired] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    const connection = await getActiveConnection();
+    // Phase 11: read the connection regardless of status, so a connection the
+    // bank has marked reauth_required is visible instead of silently absent.
+    const connection = await getCurrentConnection();
     const list = connection ? await getAccounts() : [];
     const userProfile = await getProfile();
     return { connection, list, userProfile };
@@ -122,6 +127,7 @@ export default function SettingsScreen() {
     try {
       const { connection, list, userProfile } = await fetchData();
       setConnectionId(connection?.id ?? null);
+      setReauthRequired(needsReauth(connection));
       setAccounts(list);
       setProfile(userProfile);
     } catch (e) {
@@ -138,6 +144,7 @@ export default function SettingsScreen() {
         const { connection, list, userProfile } = await fetchData();
         if (!active) return;
         setConnectionId(connection?.id ?? null);
+        setReauthRequired(needsReauth(connection));
         setAccounts(list);
         setProfile(userProfile);
       } catch (e) {
@@ -303,6 +310,30 @@ export default function SettingsScreen() {
               />
             ) : null}
           </Card>
+          {/* Phase 11: the bank has lapsed its consent. Say so plainly and
+              offer the reconnect path, rather than leaving the account listed
+              as if it were still live. */}
+          {reauthRequired ? (
+            <Card variant="paper" testID="settings-reauth">
+              <Text role="body" color="ink" style={{ fontWeight: "600" }}>
+                Reconnect your bank
+              </Text>
+              <Text role="small" color="ink" style={{ marginTop: spacing.xs, opacity: 0.7 }}>
+                Your bank needs you to approve access again before we can keep
+                your transactions up to date.
+              </Text>
+              {MONO_ENABLED ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <Button
+                    title="Reconnect"
+                    variant="secondary"
+                    onPress={() => router.push("/connect-bank")}
+                    testID="settings-reconnect"
+                  />
+                </View>
+              ) : null}
+            </Card>
+          ) : null}
           <Text role="small" color="ink" style={{ fontWeight: "600", marginTop: spacing.md }}>
             Privacy
           </Text>

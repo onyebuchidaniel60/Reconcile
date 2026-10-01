@@ -1,19 +1,35 @@
 // POST /functions/v1/bank-sync
-// Manual/initial sync for the demo provider. Authenticates the caller,
-// verifies connection ownership server-side, then:
-// fetch (demo fixture) → normalize → validate → dedupe → insert unseen →
-// create review state → detect internal transfers → write sync_runs row.
-// Idempotent: re-running inserts zero new transactions.
+//
+// Manual/initial sync, routed through the provider registry so this function
+// does not know which provider is running (Phase 11 objective).
+//
+// Pipeline (ARCHITECTURE.md §5):
+//   authenticate -> verify connection ownership -> rate limit -> record run ->
+//   provider fetch (paged) -> normalise + validate -> dedupe on the unique key
+//   -> persist immutable ledger -> detect internal transfers -> review state ->
+//   record run result -> stamp last_sync_at
+//
+// Idempotent: re-running inserts zero new transactions. Rate limited: 10
+// attempts per user per minute, enforced against sync_runs so the limit holds
+// across concurrent function instances.
+//
+// The client supplies only a connection id. Everything about the provider —
+// which adapter, which upstream ids — is resolved server-side from the
+// connection row, and the row is filtered by user_id so a client cannot sync
+// someone else's connection.
+
 import { requireUser } from "../_shared/auth.ts";
 import { json, preflight } from "../_shared/cors.ts";
-import { buildDemoDataset } from "../_shared/demo.ts";
 import { errResponse } from "../_shared/envelope.ts";
-import {
-  categorize,
-  findInternalTransferPairs,
-  validateNormalized,
-  type TransferCandidate,
-} from "../_shared/finance.ts";
+import { checkSyncRateLimit, SYNC_RATE_LIMIT } from "../_shared/rateLimit.ts";
+import { isMonoEnabled } from "../_shared/flags.ts";
+import { ingestTransactions, type TaggedTransaction } from "../_shared/ingest.ts";
+import { getProvider, DEMO_PROVIDER_ID } from "../_shared/providers/registry.ts";
+import { buildDemoDataset, type DemoTransaction } from "../_shared/demo.ts";
+import { MonoError } from "../_shared/providers/mono/client.ts";
+
+/** Page budget per account per sync. Bounds both cost and runtime. */
+const MAX_PAGES_PER_ACCOUNT = 5;
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -37,9 +53,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
   const mode = body.mode === "initial" ? "initial" : "manual";
 
+  // Ownership is enforced here: the row must belong to the caller.
   const { data: connection } = await client
     .from("bank_connections")
-    .select("id,status")
+    .select("id,status,provider_id,provider_connection_id")
     .eq("id", body.bank_connection_id)
     .eq("user_id", userId)
     .maybeSingle();
@@ -48,6 +65,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return errResponse(404, "SYNC_NOT_FOUND", "That connection was not found.", false);
   }
   if (connection.status !== "active") {
+    // reauth_required gets its own code so the client can prompt to reconnect
+    // rather than showing a generic failure.
+    if (connection.status === "reauth_required") {
+      return errResponse(
+        409,
+        "SYNC_REAUTH_REQUIRED",
+        "Please reconnect this bank to keep it up to date.",
+        false,
+      );
+    }
     return errResponse(
       409,
       "SYNC_CONNECTION_NOT_ACTIVE",
@@ -55,6 +82,52 @@ Deno.serve(async (req: Request): Promise<Response> => {
       false,
     );
   }
+
+  const isMono = connection.provider_id !== DEMO_PROVIDER_ID;
+  if (isMono && !isMonoEnabled()) {
+    return errResponse(
+      404,
+      "SYNC_PROVIDER_DISABLED",
+      "Real bank connections are not available yet.",
+      false,
+    );
+  }
+
+  const limit = await checkSyncRateLimit(client, userId, SYNC_RATE_LIMIT);
+  if (!limit.allowed) {
+    return errResponse(
+      429,
+      "SYNC_RATE_LIMITED",
+      "You're syncing too often. Please wait a moment and try again.",
+      true,
+    );
+  }
+
+  const provider = getProvider(connection.provider_id);
+  if (!provider) {
+    return errResponse(
+      500,
+      "SERVER_MISCONFIGURED",
+      "The service is not configured. Please try again later.",
+      false,
+    );
+  }
+
+  const { data: accounts } = await client
+    .from("bank_accounts")
+    .select("id,provider_account_id,status")
+    .eq("bank_connection_id", connection.id);
+
+  if (!accounts || accounts.length === 0) {
+    return errResponse(
+      500,
+      "SYNC_NO_ACCOUNTS",
+      "No accounts were found for that connection.",
+      true,
+    );
+  }
+  const accountIdByProvider: Record<string, string> = {};
+  for (const a of accounts) accountIdByProvider[a.provider_account_id] = a.id;
 
   const { data: run } = await client
     .from("sync_runs")
@@ -67,162 +140,70 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .select("id")
     .single();
 
-  const fail = async (code: string, message: string): Promise<Response> => {
+  const fail = async (code: string, message: string, retryable = true): Promise<Response> => {
     if (run) {
       await client
         .from("sync_runs")
-        .update({ status: "failed", completed_at: new Date().toISOString(), error_code: code })
+        .update({
+          status: "failed",
+          completed_at: new Date().toISOString(),
+          error_code: code,
+        })
         .eq("id", run.id);
     }
-    return errResponse(500, code, message, true);
+    return errResponse(500, code, message, retryable);
   };
 
-  const { data: accounts } = await client
-    .from("bank_accounts")
-    .select("id,provider_account_id")
-    .eq("bank_connection_id", connection.id);
-
-  if (!accounts || accounts.length === 0) {
-    return await fail("SYNC_NO_ACCOUNTS", "No accounts were found for that connection.");
-  }
-  const accountIdByProvider: Record<string, string> = {};
-  for (const a of accounts) accountIdByProvider[a.provider_account_id] = a.id;
-
-  const dataset = buildDemoDataset(Date.now());
-  const seen = dataset.transactions.length;
-  const valid = dataset.transactions.filter((t) => {
-    if (accountIdByKey(accountIdByProvider, userId, t.accountKey) === undefined) {
-      return false;
+  // ---- fetch + normalise -------------------------------------------------
+  let tagged: TaggedTransaction[];
+  try {
+    if (isMono) {
+      tagged = [];
+      for (const account of accounts) {
+        const page = await provider.listTransactions({
+          providerAccountId: account.provider_account_id,
+          maxPages: MAX_PAGES_PER_ACCOUNT,
+        });
+        for (const transaction of page.transactions) {
+          tagged.push({
+            providerAccountId: account.provider_account_id,
+            transaction,
+          });
+        }
+      }
+    } else {
+      // The demo fixture is synthetic and deterministic; it is not paged.
+      const dataset = buildDemoDataset(Date.now());
+      tagged = (dataset.transactions as DemoTransaction[]).map((t) => ({
+        providerAccountId: demoProviderAccountId(t.accountKey, userId),
+        transaction: t,
+      }));
     }
-    return validateNormalized(t).length === 0;
-  });
-
-  // Existing keys for dedupe.
-  const { data: existingRows } = await client
-    .from("transactions")
-    .select("bank_account_id,provider_transaction_id")
-    .eq("user_id", userId);
-  const existing = new Set(
-    (existingRows ?? []).map(
-      (r) => `demo::${r.bank_account_id}::${r.provider_transaction_id}`,
-    ),
-  );
-
-  const fresh = valid.filter((t) => {
-    const bankAccountId = accountIdByKey(accountIdByProvider, userId, t.accountKey);
-    return bankAccountId !== undefined &&
-      !existing.has(`demo::${bankAccountId}::${t.providerTransactionId}`);
-  });
-
-  let added = 0;
-  if (fresh.length > 0) {
-    const rows = fresh.map((t) => ({
-      user_id: userId,
-      bank_account_id: accountIdByKey(accountIdByProvider, userId, t.accountKey),
-      provider_id: "demo",
-      provider_transaction_id: t.providerTransactionId,
-      amount_minor: t.amountMinor,
-      currency: t.currency,
-      direction: t.direction,
-      semantic_type: t.semanticType,
-      occurred_at: t.occurredAt,
-      merchant_name: t.merchantName,
-      narration: t.narration,
-      normalized_merchant: t.normalizedMerchant,
-      budget_eligible: t.budgetEligible,
-    }));
-    const { data: inserted, error: insertError } = await client
-      .from("transactions")
-      .upsert(rows, {
-        onConflict: "provider_id,bank_account_id,provider_transaction_id",
-        ignoreDuplicates: true,
-      })
-      .select("id");
-    if (insertError) {
-      return await fail("SYNC_INSERT_FAILED", "We could not save the new transactions.");
+  } catch (error) {
+    if (error instanceof MonoError) {
+      await fail(error.code, "We could not refresh this bank right now.", error.retryable);
+      return errResponse(
+        error.retryable ? 503 : 502,
+        error.code,
+        "We could not refresh this bank right now.",
+        error.retryable,
+      );
     }
-    added = inserted?.length ?? 0;
+    return await fail("SYNC_FETCH_FAILED", "We could not refresh this bank right now.");
   }
 
-  // Ledger snapshot for transfer detection and review backfill.
-  const { data: ledger } = await client
-    .from("transactions")
-    .select(
-      "id,bank_account_id,direction,amount_minor,occurred_at,semantic_type,normalized_merchant,narration",
-    )
-    .eq("user_id", userId);
-
-  // High-confidence internal-transfer detection first, so pair members land
-  // reconciled instead of needs_review.
-  const ledgerCandidates: TransferCandidate[] = (ledger ?? []).map((r) => ({
-    id: r.id,
-    bankAccountId: r.bank_account_id,
-    direction: r.direction,
-    amountMinor: r.amount_minor,
-    occurredAtMs: Date.parse(r.occurred_at),
-    semanticType: r.semantic_type,
-  }));
-  const pairs = findInternalTransferPairs(ledgerCandidates);
-  for (const [a, b] of pairs) {
-    const { error: pairError } = await client
-      .from("transactions")
-      .update({ semantic_type: "internal_transfer", budget_eligible: false })
-      .in("id", [a.id, b.id]);
-    if (pairError) {
-      return await fail("SYNC_TRANSFER_FAILED", "We could not flag internal transfers.");
-    }
-    const { error: pairReviewError } = await client.from("transaction_reviews").upsert(
-      [a.id, b.id].map((id) => ({
-        transaction_id: id,
-        user_id: userId,
-        status: "reconciled",
-        category_id: "internal_transfer",
-        source: "system:internal_transfer",
-        confirmed_at: new Date().toISOString(),
-      })),
-      { onConflict: "transaction_id", ignoreDuplicates: true },
-    );
-    if (pairReviewError) {
-      return await fail("SYNC_TRANSFER_FAILED", "We could not flag internal transfers.");
-    }
-  }
-
-  // Review state for every transaction still missing one. Self-healing:
-  // covers fresh inserts and any earlier partial failure.
-  const { data: reviewed } = await client
-    .from("transaction_reviews")
-    .select("transaction_id")
-    .eq("user_id", userId);
-  const reviewedIds = new Set((reviewed ?? []).map((r) => r.transaction_id));
-  const missing = (ledger ?? []).filter((t) => !reviewedIds.has(t.id));
-  if (missing.length > 0) {
-    const { data: rules } = await client
-      .from("merchant_rules")
-      .select("merchant_key,category_id")
-      .eq("user_id", userId);
-    const ruleMap = new Map((rules ?? []).map((r) => [r.merchant_key, r.category_id]));
-    const reviews = missing.map((t) => {
-      const suggestion = categorize({
-        merchantKey: t.normalized_merchant ?? "",
-        normalizedMerchant: t.normalized_merchant ?? "",
-        narration: t.narration ?? "",
-        userRuleCategoryId: ruleMap.get(t.normalized_merchant ?? ""),
-      });
-      return {
-        transaction_id: t.id,
-        user_id: userId,
-        status: "needs_review",
-        category_id: suggestion.categoryId,
-        source: `suggestion:${suggestion.source}`,
-      };
+  // ---- ingest ------------------------------------------------------------
+  let result;
+  try {
+    result = await ingestTransactions(client, {
+      userId,
+      providerId: connection.provider_id,
+      accountIdByProvider,
+      transactions: tagged,
     });
-    const { error: reviewError } = await client.from("transaction_reviews").upsert(reviews, {
-      onConflict: "transaction_id",
-      ignoreDuplicates: true,
-    });
-    if (reviewError) {
-      return await fail("SYNC_REVIEWS_FAILED", "We could not create the review queue.");
-    }
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "SYNC_INGEST_FAILED";
+    return await fail(code, "We could not save the new transactions.");
   }
 
   if (run) {
@@ -231,8 +212,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .update({
         status: "complete",
         completed_at: new Date().toISOString(),
-        transactions_seen: seen,
-        transactions_added: added,
+        transactions_seen: result.seen,
+        transactions_added: result.inserted,
       })
       .eq("id", run.id);
   }
@@ -242,13 +223,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .update({ last_sync_at: new Date().toISOString() })
     .eq("id", connection.id);
 
-  return json({ seen, added, internal_transfer_pairs: pairs.length, run_id: run?.id ?? null });
+  return json({
+    seen: result.seen,
+    added: result.inserted,
+    rejected: result.rejected,
+    internal_transfer_pairs: result.internalTransferPairs,
+    run_id: run?.id ?? null,
+  });
 });
 
-function accountIdByKey(
-  byProvider: Record<string, string>,
-  userId: string,
-  key: string,
-): string | undefined {
-  return byProvider[`demo_${key}_${userId.slice(0, 8)}`];
+/** Mirrors the demo fixture's provider account id scheme. */
+function demoProviderAccountId(accountKey: string, userId: string): string {
+  return `demo_${accountKey}_${userId.slice(0, 8)}`;
 }

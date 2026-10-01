@@ -384,6 +384,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+[functions.mono-webhook]
+# Mono sends no Supabase JWT — only the `mono-webhook-secret` header, which this
+# function verifies itself against the MONO_WEBHOOK_SECRET secret. The gateway's
+# JWT check would reject every genuine delivery before the handler runs, so it
+# must be off. Every other function keeps the default (JWT required).
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

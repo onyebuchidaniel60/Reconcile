@@ -88,6 +88,7 @@ export default function RootLayout() {
             <Stack.Screen name="signup" options={{ title: "Sign up" }} />
             <Stack.Screen name="signin" options={{ title: "Sign in" }} />
             <Stack.Screen name="demo" options={{ title: "Demo Mode" }} />
+      <Stack.Screen name="connect-bank" options={{ title: "Connect a bank" }} />
             {/* Phase 10A.5: Home and Review render their own header rows
               inside DarkScreenScaffold (avatar/actions/greeting); the
               native Stack header would paint a light bar above the ink

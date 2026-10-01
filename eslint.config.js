@@ -14,4 +14,21 @@ module.exports = defineConfig([
     files: ["tests/setup.js"],
     languageOptions: { globals: { jest: "readonly" } },
   },
+  {
+    // Node CLI scripts (Phase 11 harness). CommonJS, so __dirname/__filename
+    // and the node built-ins are legitimately in scope.
+    files: ["scripts/**/*.cjs"],
+    languageOptions: {
+      globals: {
+        __dirname: "readonly",
+        __filename: "readonly",
+        require: "readonly",
+        module: "writable",
+        process: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        URL: "readonly",
+      },
+    },
+  },
 ]);

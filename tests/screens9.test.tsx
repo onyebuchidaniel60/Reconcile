@@ -24,6 +24,7 @@ import {
   removeAvatarObjects,
   uploadAvatarImage,
 } from "../src/lib/avatar";
+import { monthBoundsFor, monthOffset } from "../src/lib/txn";
 import ActivityScreen from "../app/activity";
 import TransactionDetailScreen from "../app/transaction/[id]";
 import BudgetSetupScreen from "../app/budget-setup";
@@ -70,6 +71,10 @@ jest.mock("../src/lib/db", () => ({
   excludeReview: jest.fn(),
   askQuestion: jest.fn(),
   getActiveConnection: jest.fn(),
+  // Phase 11: Settings reads the connection regardless of status so a
+  // reauth_required connection is visible instead of silently absent.
+  getCurrentConnection: jest.fn(),
+  needsReauth: jest.fn(() => false),
   disconnectConnection: jest.fn(),
   getReviewCount: jest.fn(),
   getPendingReviews: jest.fn(),
@@ -146,6 +151,52 @@ const CATEGORIES = [
   { id: "transport", label: "Transport" },
 ];
 
+// ---- Time-independent fixtures (Phase 11) -------------------------------
+//
+// Same fix as tests/screens.test.tsx: these screens derive "this month" from
+// the real clock, so hard-coded September 2026 fixtures rotted at the October
+// boundary. Dates are derived from today, in UTC, matching the app's UTC-midnight
+// month convention (Phase 10B.5). Days 10/11/14 exist in every month.
+
+const NOW = new Date();
+const NOW_Y = NOW.getUTCFullYear();
+const NOW_M = NOW.getUTCMonth();
+
+const utcDay = (year: number, month: number, day: number): string =>
+  new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10);
+
+const utcAt = (year: number, month: number, day: number, hour = 10): string =>
+  new Date(Date.UTC(year, month, day, hour)).toISOString();
+
+const THIS_MONTH_START = utcDay(NOW_Y, NOW_M, 1);
+const NEXT_MONTH_START = utcDay(NOW_Y, NOW_M + 1, 1);
+const THIS_MONTH_10AM = utcAt(NOW_Y, NOW_M, 10);
+const THIS_MONTH_14AM = utcAt(NOW_Y, NOW_M, 14);
+const PREV_MONTH_11AM = utcAt(NOW_Y, NOW_M - 1, 11);
+
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sept", "Oct", "Nov", "Dec",
+] as const;
+
+/** Activity groups by UTC day; the 10th/14th of the current month render as these. */
+const DAY_10_LABEL = `${MONTH_ABBR[NOW_M]} 10`;
+const DAY_14_LABEL = `${MONTH_ABBR[NOW_M]} 14`;
+
+/**
+ * A "this month" instant that is guaranteed to be in the past.
+ *
+ * `app/insights.tsx` monthBounds() ends the current month at `now`, so a
+ * fixture dated later in the month is excluded as future-dated and the
+ * insights totals read ₦0.00. Local midnight today is always inside
+ * [monthStart, now] on every day of the month.
+ */
+const THIS_MONTH_TO_DATE = (() => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+})();
+
 function txn(overrides = {}) {
   return {
     id: "t1",
@@ -154,7 +205,7 @@ function txn(overrides = {}) {
     currency: "NGN",
     direction: "debit",
     semantic_type: "expense",
-    occurred_at: "2026-09-14T10:00:00.000Z",
+    occurred_at: THIS_MONTH_14AM,
     merchant_name: "Bolt",
     narration: "Bolt trip ref 123",
     normalized_merchant: "bolt",
@@ -188,7 +239,7 @@ beforeEach(() => {
   M(mockGetCategories).mockResolvedValue(CATEGORIES);
   M(mockGetCurrentMonthBudget).mockResolvedValue({
     budget: {
-      id: "b1", period_start: "2026-09-01", period_end: "2026-10-01",
+      id: "b1", period_start: THIS_MONTH_START, period_end: NEXT_MONTH_START,
       total_limit_minor: 25000000, currency: "NGN",
     },
     caps: [{ category_id: "food", limit_minor: 5000000 }],
@@ -199,6 +250,12 @@ beforeEach(() => {
   });
   M(mockAskQuestion).mockResolvedValue({ answer: "You spent ₦72,765.74 on Food.", basis: "based on: Food spend" });
   M(mockGetActiveConnection).mockResolvedValue({ id: "c1" });
+  // Phase 11: Settings reads getCurrentConnection, which also sees a
+  // reauth_required connection.
+  const mockGetCurrentConnection = (jest.requireMock(
+    "../src/lib/db",
+  ) as { getCurrentConnection: unknown }).getCurrentConnection as MockFn;
+  mockGetCurrentConnection.mockResolvedValue({ id: "c1" });
   M(mockGetProfile).mockResolvedValue({ id: "u1", email: "ada@example.com", avatar_url: null });
   M(mockCreateBudget).mockResolvedValue(undefined);
   M(mockUpdateBudget).mockResolvedValue(undefined);
@@ -234,11 +291,11 @@ describe("Activity screen", () => {
   it("groups rows under day headers (Phase 10A)", async () => {
     M(mockGetTransactions).mockResolvedValue([
       txn(),
-      txn({ id: "t2", merchant_name: "Shoprite", occurred_at: "2026-09-10T09:00:00.000Z" }),
+      txn({ id: "t2", merchant_name: "Shoprite", occurred_at: THIS_MONTH_10AM }),
     ]);
     await render(<ActivityScreen />);
-    expect(await screen.findByTestId("activity-day-Sept 14")).toBeTruthy();
-    expect(screen.getByTestId("activity-day-Sept 10")).toBeTruthy();
+    expect(await screen.findByTestId(`activity-day-${DAY_14_LABEL}`)).toBeTruthy();
+    expect(screen.getByTestId(`activity-day-${DAY_10_LABEL}`)).toBeTruthy();
     expect(screen.getByText("Bolt")).toBeTruthy();
     expect(screen.getByText("Shoprite")).toBeTruthy();
   });
@@ -486,11 +543,48 @@ describe("Budget screen", () => {
   });
 });
 
+// Guards the fixture-date trap that made this suite rot (Phase 11). These
+// assertions are what the screen fixtures above silently depend on.
+describe("time-independent fixtures", () => {
+  it("places THIS_MONTH_TO_DATE inside the current month bounds the app uses", () => {
+    const now = new Date();
+    const { startMs } = monthBoundsFor(now);
+    const at = Date.parse(THIS_MONTH_TO_DATE);
+    expect(at).toBeGreaterThanOrEqual(startMs);
+    // insights monthBounds() ends the current month at `now`, so a fixture
+    // dated later in the month would read as future-dated and total ₦0.00.
+    expect(at).toBeLessThanOrEqual(now.getTime());
+  });
+
+  it("places THIS_MONTH_14AM and THIS_MONTH_10AM inside the current calendar month", () => {
+    const now = new Date();
+    const { startMs, endMs } = monthBoundsFor(now);
+    for (const iso of [THIS_MONTH_14AM, THIS_MONTH_10AM]) {
+      const at = Date.parse(iso);
+      expect(at).toBeGreaterThanOrEqual(startMs);
+      expect(at).toBeLessThan(endMs);
+    }
+  });
+
+  it("places PREV_MONTH_11AM inside the previous calendar month", () => {
+    const now = new Date();
+    const prev = monthBoundsFor(monthOffset(now, 1));
+    const at = Date.parse(PREV_MONTH_11AM);
+    expect(at).toBeGreaterThanOrEqual(prev.startMs);
+    expect(at).toBeLessThan(prev.endMs);
+  });
+
+  it("derives budget period bounds from the current month", () => {
+    expect(THIS_MONTH_START).toBe(utcDay(NOW_Y, NOW_M, 1));
+    expect(NEXT_MONTH_START).toBe(utcDay(NOW_Y, NOW_M + 1, 1));
+  });
+});
+
 describe("Insights screen", () => {
   it("renders the insight cards with real numbers", async () => {
     M(mockGetTransactions).mockResolvedValue([
-      txn(),
-      txn({ id: "old", occurred_at: "2026-08-11T09:00:00.000Z" }),
+      txn({ occurred_at: THIS_MONTH_TO_DATE }),
+      txn({ id: "old", occurred_at: PREV_MONTH_11AM }),
     ]);
     await render(<InsightsScreen />);
     expect(await screen.findByText("This month vs last month")).toBeTruthy();
@@ -500,7 +594,7 @@ describe("Insights screen", () => {
 
   it("shows the first-month card without history", async () => {
     M(mockGetTransactions).mockResolvedValue([
-      txn({ occurred_at: "2026-09-14T10:00:00.000Z" }),
+      txn({ occurred_at: THIS_MONTH_TO_DATE }),
     ]);
     await render(<InsightsScreen />);
     expect(await screen.findByText("Insights arrive after your first month.")).toBeTruthy();
@@ -509,12 +603,13 @@ describe("Insights screen", () => {
   it("labels the top merchant with the user's display name (Phase 10A.5, Fix 7)", async () => {
     M(mockGetTransactions).mockResolvedValue([
       txn({
+        occurred_at: THIS_MONTH_TO_DATE,
         merchant_name: "Bolt",
         transaction_reviews: [
           { status: "reconciled", category_id: "transport", user_note: null, display_name: "Bolt Rides" },
         ],
       }),
-      txn({ id: "old", occurred_at: "2026-08-11T09:00:00.000Z" }),
+      txn({ id: "old", occurred_at: PREV_MONTH_11AM }),
     ]);
     await render(<InsightsScreen />);
     expect(await screen.findByText("Top merchant")).toBeTruthy();

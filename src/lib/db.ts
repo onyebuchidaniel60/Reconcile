@@ -127,6 +127,34 @@ export async function getActiveConnection(): Promise<BankConnection | null> {
   return data;
 }
 
+/**
+ * The user's current connection including ones that need attention.
+ *
+ * Phase 11: `getActiveConnection` filters to `status = 'active'`, so a
+ * `reauth_required` connection is invisible and the user is never prompted to
+ * reconnect. This reads the newest connection regardless of status so the UI
+ * can show the reauth state and offer a reconnect.
+ *
+ * `revoked` is excluded: a revoked connection is something the user has
+ * already ended and should not be surfaced as needing attention.
+ */
+export async function getCurrentConnection(): Promise<BankConnection | null> {
+  const { data, error } = await getSupabase()
+    .from("bank_connections")
+    .select("id,provider_id,status,last_sync_at")
+    .neq("status", "revoked")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(friendly(error, "Could not load connection."));
+  return data;
+}
+
+/** True when the connection needs the user to re-consent with their bank. */
+export function needsReauth(connection: BankConnection | null): boolean {
+  return connection?.status === "reauth_required";
+}
+
 export async function getAccounts(): Promise<BankAccount[]> {
   const { data, error } = await getSupabase()
     .from("bank_accounts")
@@ -190,6 +218,78 @@ export async function askQuestion(question: string): Promise<AskResult> {
   });
   if (error) throw new Error(friendly(error, "Could not answer that question."));
   return data as AskResult;
+}
+
+// --------------------------------------------------- real bank (Phase 11)
+
+/** What bank-connect-session returns for a real provider. */
+export interface ConnectSession {
+  provider_id: string;
+  reference: string;
+  connect_url: string | null;
+  session_token: string | null;
+  public_key: string | null;
+  expires_at: string | null;
+}
+
+/**
+ * Ask the server to start a real bank connection.
+ *
+ * The server mints the Mono Connect Link, so the secret key never reaches this
+ * module and nothing Mono-specific is constructed on the client.
+ */
+export async function createConnectSession(
+  providerId: string,
+  redirectUrl: string,
+): Promise<ConnectSession> {
+  const { data, error } = await getSupabase().functions.invoke("bank-connect-session", {
+    body: { provider_id: providerId, redirect_url: redirectUrl },
+  });
+  if (error) throw new Error(friendly(error, "Could not start the bank connection."));
+  return data as ConnectSession;
+}
+
+/**
+ * Exchange the widget's authorization code for an account, server-side.
+ *
+ * Returns null when Mono reports the account's data is not ready yet, which is
+ * a normal state right after linking rather than an error.
+ */
+export async function exchangeConnectCode(code: string): Promise<boolean> {
+  const { error } = await getSupabase().functions.invoke("bank-exchange-code", {
+    body: { code },
+  });
+  if (!error) return true;
+  const message = friendly(error, "");
+  if (message.includes("CONNECT_ACCOUNT_UNAVAILABLE")) return false;
+  throw new Error(message || "Could not complete the bank connection.");
+}
+
+/**
+ * Wait for the `account_connected` webhook to activate a reserved connection.
+ *
+ * Mono's documented Connect Link flow completes via webhook, not via a code the
+ * host can read, so the app polls the connection row it caused to be created.
+ * This is a UI-side wait only; nothing here can change server state.
+ */
+export async function waitForConnection(
+  reference: string,
+  options: { attempts?: number; intervalMs?: number } = {},
+): Promise<BankConnection | null> {
+  const attempts = options.attempts ?? 12;
+  const intervalMs = options.intervalMs ?? 2500;
+
+  for (let i = 0; i < attempts; i++) {
+    const { data, error } = await getSupabase()
+      .from("bank_connections")
+      .select("id,provider_id,status,last_sync_at")
+      .eq("provider_connection_id", reference)
+      .maybeSingle();
+    if (error) throw new Error(friendly(error, "Could not check the bank connection."));
+    if (data && data.status !== "pending") return data as BankConnection;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return null;
 }
 
 export async function getPendingReviews(): Promise<ReviewItem[]> {

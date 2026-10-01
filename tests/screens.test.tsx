@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { afterEach, describe, expect, it, jest, beforeEach } from "@jest/globals";
 import type { ReactNode } from "react";
 import * as motion from "../src/theme/motion";
 import { categoryTintFor, directionFor, formatBoundLabel, formatPeriodLabel, formatRowDate, monthOffset, monthSampleDays, periodIncome, resolveDisplayName } from "../src/lib/txn";
@@ -112,8 +112,27 @@ jest.mock("../src/lib/db", () => ({
   connectDemo: jest.fn(),
   syncConnection: jest.fn(),
   getActiveConnection: jest.fn(),
+  // Phase 11: Settings reads the connection regardless of status so a
+  // reauth_required connection is visible instead of silently absent.
+  getCurrentConnection: jest.fn(),
+  needsReauth: jest.fn(() => false),
   getProfile: jest.fn(),
 }));
+
+// Phase 11 feature flag. The jest.mock factory is hoisted above module-level
+// declarations, so the mutable holder cannot be a local const — it is parked on
+// globalThis and read back through the helper below.
+jest.mock("../src/lib/flags", () => {
+  const holder = { MONO_ENABLED: false, MONO_PUBLIC_KEY: "" };
+  (globalThis as unknown as { __monoFlags: typeof holder }).__monoFlags = holder;
+  return holder;
+});
+
+/** Flip the flag the Demo screen reads, without resetting the module registry. */
+function setMonoEnabled(value: boolean): void {
+  (globalThis as unknown as { __monoFlags: { MONO_ENABLED: boolean } }).__monoFlags.MONO_ENABLED =
+    value;
+}
 
 type MockFn = ReturnType<typeof jest.fn>;
 const mockGetAccounts = getAccounts as unknown as MockFn;
@@ -133,6 +152,44 @@ const CATEGORIES = [
   { id: "transport", label: "Transport" },
 ];
 
+// ---- Time-independent fixtures (Phase 11) -------------------------------
+//
+// These screens compute "this month" and "today" from the real clock. The
+// fixtures used to hard-code September 2026 dates, which meant the suite
+// silently rotted the moment the calendar moved to October — six tests failed
+// with ₦0.00 while the product was fine. Fixtures are now derived from today
+// so the month-boundary logic is exercised on every run, in every month.
+//
+// Days 10/11/14 are safe in every month (the shortest has 28). Dates are built
+// in UTC because the app's day/month grouping is done on UTC midnight, which
+// is the convention pinned in Phase 10B.5.
+
+const NOW = new Date();
+const NOW_Y = NOW.getUTCFullYear();
+const NOW_M = NOW.getUTCMonth();
+
+/** yyyy-mm-dd in UTC. */
+const utcDay = (year: number, month: number, day: number): string =>
+  new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10);
+
+/** Full ISO instant in UTC, e.g. 2026-09-14T10:00:00.000Z. */
+const utcAt = (year: number, month: number, day: number, hour = 10): string =>
+  new Date(Date.UTC(year, month, day, hour)).toISOString();
+
+const THIS_MONTH_START = utcDay(NOW_Y, NOW_M, 1);
+const NEXT_MONTH_START = utcDay(NOW_Y, NOW_M + 1, 1);
+const THIS_MONTH_10AM = utcAt(NOW_Y, NOW_M, 10);
+const THIS_MONTH_14AM = utcAt(NOW_Y, NOW_M, 14);
+const PREV_MONTH_11AM = utcAt(NOW_Y, NOW_M - 1, 11);
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+] as const;
+
+/** What the Home month selector should read for the current month. */
+const THIS_MONTH_LABEL = `${MONTH_NAMES[NOW_M]} ${NOW_Y}`;
+
 function txn(overrides = {}) {
   return {
     id: "t1",
@@ -141,7 +198,7 @@ function txn(overrides = {}) {
     currency: "NGN",
     direction: "debit",
     semantic_type: "expense",
-    occurred_at: "2026-09-14T10:00:00.000Z",
+    occurred_at: THIS_MONTH_14AM,
     merchant_name: "Bolt",
     narration: null,
     normalized_merchant: "bolt",
@@ -191,8 +248,8 @@ beforeEach(() => {
   mockGetCurrentMonthBudget.mockResolvedValue({
     budget: {
       id: "b1",
-      period_start: "2026-09-01",
-      period_end: "2026-10-01",
+      period_start: THIS_MONTH_START,
+      period_end: NEXT_MONTH_START,
       total_limit_minor: 25000000,
       currency: "NGN",
     },
@@ -268,7 +325,7 @@ describe("Onboarding screens", () => {
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/home"));
   });
 
-  it("Demo entry shows the Connect placeholder as disabled", async () => {
+  it("Demo entry shows the Connect placeholder as disabled when the Mono flag is off", async () => {
     await render(<DemoScreen />);
     await screen.findByText("Try");
     expect(screen.getByText("Coming soon")).toBeTruthy();
@@ -277,6 +334,70 @@ describe("Onboarding screens", () => {
         .accessibilityState.disabled,
     ).toBe(true);
   });
+
+  // Phase 11: "Connect a real bank" is gated on EXPO_PUBLIC_FEATURE_MONO. With
+  // the flag off it must behave exactly as it did in Phase 8 (disabled,
+  // "Coming soon"). With the flag on it must be enabled and route to the
+  // connect flow. The demo path must not move either way.
+  //
+  // The flag is mocked through the same module the screen imports it from
+  // (src/lib/flags). Babel compiles that named import to a property read at the
+  // use site, so calling setMonoEnabled(...) before render is enough — no
+  // module reset needed.
+  describe("Connect a real bank feature flag", () => {
+    afterEach(() => {
+      setMonoEnabled(false);
+      mockPush.mockClear();
+      mockConnectDemo.mockClear();
+      mockReplace.mockClear();
+      mockGetActiveConnection.mockResolvedValue(null);
+    });
+
+    it("stays disabled with the 'Coming soon' label when the flag is off", async () => {
+      setMonoEnabled(false);
+      mockGetActiveConnection.mockResolvedValue(null);
+      await render(<DemoScreen />);
+      await screen.findByText("Try");
+      expect(screen.getByText("Coming soon")).toBeTruthy();
+      const button = screen.getByRole("button", {
+        name: "Connect a real bank, coming soon",
+      });
+      expect(button.props.accessibilityState.disabled).toBe(true);
+      await fireEvent.press(button);
+      expect(mockPush).not.toHaveBeenCalledWith("/connect-bank");
+    });
+
+    it("is enabled and routes to the connect flow when the flag is on", async () => {
+      setMonoEnabled(true);
+      mockGetActiveConnection.mockResolvedValue(null);
+      await render(<DemoScreen />);
+      await screen.findByText("Try");
+      expect(screen.getByText("Powered by Mono")).toBeTruthy();
+      const button = screen.getByRole("button", { name: "Connect a real bank" });
+      expect(button.props.accessibilityState?.disabled).toBeFalsy();
+      await fireEvent.press(button);
+      await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/connect-bank"));
+    });
+
+    it("leaves the demo path enabled in both flag states", async () => {
+      for (const flag of [false, true]) {
+        setMonoEnabled(flag);
+        mockConnectDemo.mockResolvedValue({
+          connection: { id: "c1", provider_id: "demo", status: "active", last_sync_at: null },
+          accounts: [],
+          created: true,
+        });
+        mockSyncConnection.mockResolvedValue({ seen: 3, added: 3, internal_transfer_pairs: 1 });
+        mockGetActiveConnection.mockResolvedValue(null);
+        await render(<DemoScreen />);
+        await screen.findByText("Try");
+        const demo = screen.getByRole("button", { name: "Enter Demo Mode" });
+        expect(demo.props.accessibilityState?.disabled).toBeFalsy();
+        await fireEvent.press(demo);
+        await waitFor(() => expect(mockReplace).toHaveBeenCalledWith("/home"));
+      }
+    });
+  });
 });
 
 describe("Home screen", () => {
@@ -284,7 +405,7 @@ describe("Home screen", () => {
     mockSessionEmail = "adaeze@example.com";
     await render(<HomeScreen />);
     expect(await screen.findByText("Hey, Adaeze")).toBeTruthy();
-    expect(screen.getByText("September 2026")).toBeTruthy();
+    expect(screen.getByText(THIS_MONTH_LABEL)).toBeTruthy();
     expect(screen.getByText("Budget Overview")).toBeTruthy();
     expect(screen.getByText("Bolt")).toBeTruthy();
     expect(screen.getByTestId("home-menu").props.accessibilityLabel).toBe(
@@ -565,12 +686,16 @@ describe("txn display helpers", () => {
     expect(categoryTintFor(bare, CATEGORIES, "food")).toBe("Food");
   });
 
+  // These three are pure formatters with no dependency on "now": a fixed input
+  // must produce a fixed output, so the absolute dates are the assertion, not
+  // a rot risk. Deliberately left absolute (Phase 11).
   it("formats row, period, and bound labels", () => {
     expect(formatRowDate("2026-09-14T10:00:00.000Z")).toBe("Sept 14");
     expect(formatPeriodLabel(new Date(2026, 8, 1))).toBe("September 2026");
     expect(formatBoundLabel(new Date(2026, 8, 1))).toBe("Sept 1, 2026");
   });
 
+  // Also pure: day sampling depends only on the month's length.
   it("samples trend days without timezone collapse (Phase 10A)", () => {
     expect(monthSampleDays("2026-09-01")).toEqual([1, 10, 20, 30]);
     expect(monthSampleDays("2026-02-01")).toEqual([1, 10, 19, 28]);
@@ -597,12 +722,13 @@ describe("txn display helpers", () => {
   });
 
   it("sums in-month income regardless of eligibility", () => {
-    const start = new Date(2026, 8, 1).getTime();
-    const end = new Date(2026, 9, 1).getTime();
+    // Window is the current month, matching the relative fixtures above.
+    const start = Date.UTC(NOW_Y, NOW_M, 1);
+    const end = Date.UTC(NOW_Y, NOW_M + 1, 1);
     const rows = [
-      txn({ id: "i1", semantic_type: "income", amount_minor: 45000000, occurred_at: "2026-09-10T09:00:00.000Z", budget_eligible: false }),
-      txn({ id: "i2", semantic_type: "income", amount_minor: 12000000, occurred_at: "2026-08-11T09:00:00.000Z", budget_eligible: false }),
-      txn({ id: "e1", semantic_type: "expense", amount_minor: 420000, occurred_at: "2026-09-14T10:00:00.000Z" }),
+      txn({ id: "i1", semantic_type: "income", amount_minor: 45000000, occurred_at: THIS_MONTH_10AM, budget_eligible: false }),
+      txn({ id: "i2", semantic_type: "income", amount_minor: 12000000, occurred_at: PREV_MONTH_11AM, budget_eligible: false }),
+      txn({ id: "e1", semantic_type: "expense", amount_minor: 420000, occurred_at: THIS_MONTH_14AM }),
     ];
     expect(periodIncome(rows, start, end)).toBe(45000000);
   });

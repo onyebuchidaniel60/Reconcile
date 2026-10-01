@@ -12,6 +12,7 @@ import {
   syncConnection,
   type BankAccount,
 } from "../src/lib/db";
+import { MONO_ENABLED } from "../src/lib/flags";
 import { spacing } from "../src/theme/spacing";
 
 export default function DemoScreen() {
@@ -173,12 +174,17 @@ export default function DemoScreen() {
         <Button
           title="Connect a real bank"
           variant="ghost"
-          disabled
-          accessibilityLabel="Connect a real bank, coming soon"
+          disabled={!MONO_ENABLED}
+          onPress={MONO_ENABLED ? () => router.push("/connect-bank") : undefined}
+          accessibilityLabel={
+            MONO_ENABLED
+              ? "Connect a real bank"
+              : "Connect a real bank, coming soon"
+          }
           testID="demo-connect"
         />
         <Text role="small" color="ink" style={{ opacity: 0.6, textAlign: "center" }}>
-          Coming soon
+          {MONO_ENABLED ? "Powered by Mono" : "Coming soon"}
         </Text>
       </View>
     </FormScaffold>
