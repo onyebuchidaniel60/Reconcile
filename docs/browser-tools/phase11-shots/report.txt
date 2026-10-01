@@ -1,14 +1,11 @@
-signin: signed in (masked), landed on /demo
-gate: Connect a real bank present=true disabled= aria-disabled=true "Coming soon" text=true
-gate: after click on disabled button, url=/demo
+signin: signed in, landed on /demo
+gate: Connect a real bank present=true disabled=null aria-disabled=null "Coming soon"=false => flag ON
+connect-flow: button is enabled and navigates to /connect-bank
+connect-flow: after 'Choose a bank': frames=["http://localhost:4180/connect-bank","https://link.mono.co/ALR8ICY7NTIP"] monoWidgetLoaded=true
+connect-flow: surface hasError=false
 demo-path: clicked "Enter Demo Mode"
-demo-path: Enter Demo Mode still routes to /home
-demo-path: home rendered 254 chars; has greeting=true
-regression: home: url=/home chars=254 hasError=false
-regression: activity: url=/activity chars=1985 hasError=false
-regression: budget: url=/budget chars=80 hasError=false
-regression: insights: url=/insights chars=221 hasError=false
-regression: review: url=/review chars=1616 hasError=false
-settings: rendered=259 chars hasSections=true reauthCardShown=false (expected false: no reauth state)
-connect-route: flag off -> shows unavailable notice=true webviewPresent=false
-console-errors: none
+ERROR: page.waitForURL: Timeout 60000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "load"
+============================================================
+console-errors: Failed to load resource: net::ERR_QUIC_PROTOCOL_ERROR | Failed to load resource: net::ERR_NAME_NOT_RESOLVED | Failed to load resource: net::ERR_NAME_NOT_RESOLVED | Failed to load resource: net::ERR_NAME_NOT_RESOLVED | Failed to load resource: net::ERR_NAME_NOT_RESOLVED | Failed to load resource: net::ERR_NAME_NOT_RESOLVED

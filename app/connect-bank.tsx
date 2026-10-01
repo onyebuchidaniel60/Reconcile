@@ -17,7 +17,7 @@
 // screen is the connect URL, which is a public, single-use link.
 import { useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { X } from "lucide-react-native";
 import { Button } from "../src/components/Button";
@@ -213,20 +213,43 @@ export default function ConnectBankScreen() {
 
       <View style={{ flex: 1, minHeight: 420 }}>
         {connectUrl ? (
-          <WebView
-            source={{ uri: connectUrl }}
-            originWhitelist={["https://*", "http://*"]}
-            javaScriptEnabled
-            domStorageEnabled
-            sharedCookiesEnabled
-            thirdPartyCookiesEnabled
-            setSupportMultipleWindows={false}
-            mixedContentMode="never"
-            onMessage={onMessage}
-            onNavigationStateChange={onNavigationStateChange}
-            style={{ flex: 1, borderRadius: radius.card, backgroundColor: colors.paper }}
-            testID="connect-bank-webview"
-          />
+          // react-native-webview does not support react-native-web (it throws
+          // "React Native WebView does not support this platform"), and Mono's
+          // Connect Link is an ordinary hosted web page, so web gets a plain
+          // iframe. Native gets a real WebView, which additionally gives us
+          // postMessage and per-navigation callbacks.
+          //
+          // Completion does not depend on either: the authoritative channel is
+          // the account_connected webhook claiming the reserved reference, which
+          // complete() polls on both platforms.
+          Platform.OS === "web" ? (
+            <iframe
+              src={connectUrl}
+              title="Connect your bank"
+              style={{
+                flex: 1,
+                borderRadius: radius.card,
+                border: "none",
+                backgroundColor: colors.paper,
+              }}
+              allow="clipboard-write"
+            />
+          ) : (
+            <WebView
+              source={{ uri: connectUrl }}
+              originWhitelist={["https://*", "http://*"]}
+              javaScriptEnabled
+              domStorageEnabled
+              sharedCookiesEnabled
+              thirdPartyCookiesEnabled
+              setSupportMultipleWindows={false}
+              mixedContentMode="never"
+              onMessage={onMessage}
+              onNavigationStateChange={onNavigationStateChange}
+              style={{ flex: 1, borderRadius: radius.card, backgroundColor: colors.paper }}
+              testID="connect-bank-webview"
+            />
+          )
         ) : (
           <Card variant="paper" testID="connect-bank-cta">
             <Text role="body" color="ink">

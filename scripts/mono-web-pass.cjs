@@ -52,7 +52,7 @@ function note(step, detail) {
     // and must not carry credentials.
     note("signin", `signed in, landed on /demo`);
 
-    // ---- the Demo screen, flag OFF ------------------------------------
+    // ---- the Demo screen, flag state -----------------------------------
     await page.waitForSelector("text=Try", { timeout: 20000 });
     await page.screenshot({ path: path.join(SHOTS, "01-demo-flag-off.png"), fullPage: true });
 
@@ -60,15 +60,57 @@ function note(step, detail) {
     const disabled = await connectBtn.getAttribute("disabled");
     const ariaDisabled = await connectBtn.getAttribute("aria-disabled");
     const comingSoon = await page.locator("text=Coming soon").count();
+    const flagOn = disabled === null && ariaDisabled === null && comingSoon === 0;
     note(
       "gate",
-      `Connect a real bank present=${(await connectBtn.count()) > 0} disabled=${disabled} aria-disabled=${ariaDisabled} "Coming soon" text=${comingSoon > 0}`,
+      `Connect a real bank present=${(await connectBtn.count()) > 0} disabled=${disabled} ` +
+        `aria-disabled=${ariaDisabled} "Coming soon"=${comingSoon > 0} => flag ${flagOn ? "ON" : "OFF"}`,
     );
 
-    // With the flag off it must NOT navigate.
-    await connectBtn.click({ force: true }).catch(() => {});
-    await page.waitForTimeout(2500);
-    note("gate", `after click on disabled button, url=${new URL(page.url()).pathname}`);
+    // ---- the real-bank connect route, when the flag is on ---------------
+    if (flagOn) {
+      await connectBtn.click();
+      await page.waitForURL(/\/connect-bank/, { timeout: 30000 });
+      note("connect-flow", "button is enabled and navigates to /connect-bank");
+      await page.waitForTimeout(2000);
+      await page.screenshot({
+        path: path.join(SHOTS, "06-connect-bank-flag-on.png"),
+        fullPage: true,
+      });
+
+      const startBtn = page.getByRole("button", { name: /Choose a bank/ });
+      if ((await startBtn.count()) === 0) {
+        note("connect-flow", "no 'Choose a bank' CTA found");
+      } else {
+        await startBtn.click();
+        // Give bank-connect-session time to reach Mono and return a link.
+        await page.waitForTimeout(20000);
+        const frames = page.frames().map((f) => {
+          try {
+            return f.url();
+          } catch {
+            return "(unreadable)";
+          }
+        });
+        note(
+          "connect-flow",
+          `after 'Choose a bank': frames=${JSON.stringify(frames)} ` +
+            `monoWidgetLoaded=${frames.some((u) => u.includes("mono.co"))}`,
+        );
+        const errText = await page.locator("body").innerText();
+        note(
+          "connect-flow",
+          `surface hasError=${/could not|unavailable|error/i.test(errText)}`,
+        );
+        await page.screenshot({
+          path: path.join(SHOTS, "07-connect-bank-widget.png"),
+          fullPage: true,
+        });
+      }
+      // Back to the demo screen for the demo-path checks.
+      await page.goto(`${BASE}/demo`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(2500);
+    }
 
     // ---- demo path must be unaffected --------------------------------
     // A user who has already run the demo sees "Continue to Home" instead of
@@ -79,7 +121,7 @@ function note(step, detail) {
       (await enterDemo.count()) > 0 ? "Enter Demo Mode" : "Continue to Home";
     await (label === "Enter Demo Mode" ? enterDemo : continueHome).click();
     note("demo-path", `clicked "${label}"`);
-    await page.waitForURL(/\/home/, { timeout: 60000 });
+    await page.waitForURL(/\/home/, { timeout: 120000 });
     note("demo-path", "Enter Demo Mode still routes to /home");
     await page.waitForTimeout(3000);
     await page.screenshot({ path: path.join(SHOTS, "02-home-demo.png"), fullPage: true });
