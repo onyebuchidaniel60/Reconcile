@@ -14,7 +14,7 @@ command**. The frontend layer (Phases 3–10) remains closed and untouched.
 | Fact | Value |
 |---|---|
 | Last verified APK (operator-verified on device) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` (Phase 10B.5) |
-| Phase 11 preview APK, **flag ON** (**not** operator-verified) | `https://expo.dev/artifacts/eas/YPG8ZY62ea8eoEZBmA2x4pm6VeF75vkcevcU2rkefso.apk` (from `4ea3a3c`) |
+| Phase 11 preview APK, **flag ON + native redirect fix** (**not** operator-verified) | `https://expo.dev/artifacts/eas/gv8_HhXk9dE1KssrnogXsaZ0nLX-bD75NPgTjxrCXYc.apk` (from `cc89033`) |
 | Live web alias | `https://reconcile-uhhh2.vercel.app` |
 | Phase 11 commits | `83eb253` feature · `43da122` handoff · `681134c` operator flag flip · `4ea3a3c` web-widget fix |
 | `demo-v1` tag | `b05b4c2` (**note:** the handoff previously claimed `991851b`; the actual tag points at `b05b4c2`) |
@@ -92,6 +92,13 @@ never in any env file:
 | `MONO_SECRET_KEY` | **Set and verified working** — a live authenticated `GET /v3/institutions` returns 200, and `POST /v2/accounts/initiate` returns a real Connect Link. Note it is a bare 64-char hex string with **no** `test_sk_`/`live_sk_` prefix. |
 | `MONO_WEBHOOK_SECRET` | **Set by the operator.** Value no longer readable by an agent — see the masking note below. |
 | `FEATURE_MONO` | **`true`** — the server half of the Phase 11 gate. It was unset when the client flag was first flipped, which made every Mono route return 404 while the UI showed the button enabled. |
+| `APP_SCHEME` | **`reconcile`** — must equal `scheme` in `app.json`. `bank-connect-session` uses it to accept the native deep-link redirect. Unset means the custom-scheme branch is **closed** (fail-closed) and native gets a 400. Added to fix the native connect failure. |
+
+> **Edge Function logs are NOT retrievable from this CLI.** `supabase functions`
+> has no `logs` subcommand, and the Management API `logs.all` endpoint has been
+> removed (Supabase changelog 48235). Diagnose a function by **reproducing the
+> request directly with a real JWT** — that returns the actual error code and is
+> more conclusive than logs. See "native connect failure" below.
 
 > **Secret masking (learned Phase 11 close-out).** `npx supabase secrets list`
 > and the Supabase Management API `GET /v1/projects/{ref}/secrets` now return an
@@ -498,25 +505,89 @@ and flipping the client flag are **done**. Remaining:
 2. Install the preview APK below and walk the loop.
 3. Confirm the deployed web build has the flag on (see the caching note).
 
-### Phase 11 preview APK (flag ON)
+### Phase 11 preview APKs (flag ON)
 
-| | |
+| | APK |
 |---|---|
-| APK | `https://expo.dev/artifacts/eas/YPG8ZY62ea8eoEZBmA2x4pm6VeF75vkcevcU2rkefso.apk` |
-| Build page | `https://expo.dev/accounts/buchi208/projects/reconcile/builds/7ddc8783-583b-4d87-b2b6-f8f74fa6114d` |
-| Built from | `4ea3a3c` (flag on, includes the iframe fix), Expo SDK 57.0.0, preview profile |
-| EAS queue | ~50 min in queue, ~14 min build |
+| **Current — native redirect fix** | `https://expo.dev/artifacts/eas/gv8_HhXk9dE1KssrnogXsaZ0nLX-bD75NPgTjxrCXYc.apk` (from `cc89033`) |
+| Superseded (iframe fix, native connect broken) | `https://expo.dev/artifacts/eas/YPG8ZY62ea8eoEZBmA2x4pm6VeF75vkcevcU2rkefso.apk` (from `4ea3a3c`) |
 
-An earlier flag-on build (`7576d404`) was **cancelled**: it had been queued
-before the iframe fix was committed, so its `gitCommitHash` pointed at a dirty
-tree rather than a commit. Re-submitting after the commit means the APK always
+Build page: `https://expo.dev/accounts/buchi208/projects/reconcile/builds/e45f7ab7-14c1-49ef-a4cb-f08a4f4b8de1`
+
+Two builds were cancelled during this phase because their `gitCommitHash`
+pointed at a dirty tree rather than a commit (`7576d404`, `7ddc8783`'s
+predecessor). Submitting only after the commit means every shipped APK
 corresponds to an exact commit.
 
 **Native smoke test pending operator installation.** On device, check: the
-"Connect a real bank" button is **enabled** (the flag is on, so it no longer
-shows "Coming soon") -> it opens the Mono widget -> pick a sandbox bank and log
-in -> the app returns, syncs, and the account appears in Settings ->
-transactions in Activity -> review -> categorize -> budget updates.
+"Connect a real bank" button is **enabled** (flag on, so no "Coming soon") ->
+it opens the Mono widget -> pick a sandbox bank and log in -> the app returns,
+syncs, and the account appears in Settings -> transactions in Activity ->
+review -> categorize -> budget updates.
+
+## Phase 11 — native connect failure, diagnosed and fixed (`cc89033`)
+
+**Symptom.** On the flag-on APK, tapping "Connect a real bank" produced
+"edge function returned a non-2xx status code".
+
+**Diagnosis, in order.**
+
+| Step | Result |
+|---|---|
+| 1. Secrets | `FEATURE_MONO`, `MONO_SECRET_KEY`, `MONO_WEBHOOK_SECRET` all present |
+| 2. `MONO_SECRET_KEY` validity | `GET https://api.withmono.com/v3/institutions?scope=financial_data` -> **HTTP 200** |
+| 3. Edge Function logs | **Not obtainable.** This CLI has no `functions logs` subcommand, and the Management API `logs.all` endpoint has been removed (changelog 48235). Replaced with direct reproduction, which is conclusive. |
+| 4. Actual error | **`400 INVALID_INPUT` — "redirect_url is required and must be an http(s) URL."** |
+
+**Root cause — a bug of ours, not auth, CORS, or the Mono key.**
+`bank-connect-session` accepted `redirect_url` only if `http:`/`https:`.
+`src/lib/monoWidget.ts` builds that URL with `Linking.createURL("connect-bank")`,
+which is platform-dependent:
+
+- web -> `https://host/connect-bank?...` -> accepted
+- **native -> `reconcile://connect-bank?...`** (from `scheme` in app.json) -> **rejected**
+
+So the identical request that the web pass made successfully was a 400 on
+native. Reproduced against the deployed function *before* the fix:
+
+```
+redirect_url=reconcile://connect-bank?status=complete  -> 400 INVALID_INPUT
+redirect_url=https://.../connect-bank                 -> 200 + live Connect Link
+```
+
+**Fix.** The blanket http(s) rule existed to keep a script-bearing or
+non-navigable scheme out of Mono's `redirect_url`. That concern is legitimate,
+so it was not removed — it was made precise. New pure module
+`_shared/redirect.ts` accepts:
+
+- `http:`/`https:` — web, and any hosted fallback
+- the app's own scheme, matched **explicitly** against the `APP_SCHEME` function
+  secret, not accepted blindly
+
+Still refused: `javascript:`, `data:`, `file:`, `about:`, `blob:`, any other
+scheme, unparseable input, and scheme-lookalikes (`reconcile.evil://`,
+`xreconcile://`). An unset `APP_SCHEME` leaves the custom-scheme branch **closed**
+— fail-closed, not fail-open.
+
+Verified against the deployed function *after* the fix:
+
+| `redirect_url` | Result |
+|---|---|
+| `reconcile://connect-bank?status=complete` | **200**, live Connect Link |
+| `https://.../connect-bank` | **200**, live Connect Link |
+| `javascript:alert(1)` | 400 |
+| `otherapp://connect-bank` | 400 |
+| demo provider | unchanged (`created:false`) |
+
+`tests/redirect.test.ts` (8 tests) pins the exact native value that broke plus
+the hostile-scheme cases, so this cannot regress silently. Suite: **269 passed,
+0 failed**.
+
+**Operator action required:** `APP_SCHEME` was added as an Edge Function secret
+with the value `reconcile`. It must be kept equal to `scheme` in `app.json`. The
+fix itself is server-side and already live, so the deployed function carries it
+regardless of which APK is installed.
+
 
 ### Caching note that will bite again
 
