@@ -15,6 +15,7 @@ import { requireUser } from "../_shared/auth.ts";
 import { json, preflight } from "../_shared/cors.ts";
 import { errResponse } from "../_shared/envelope.ts";
 import { isMonoEnabled } from "../_shared/flags.ts";
+import { isAllowedRedirect } from "../_shared/redirect.ts";
 import { getProvider, DEMO_PROVIDER_ID, MONO_PROVIDER_ID } from "../_shared/providers/registry.ts";
 import { upsertAccounts, upsertConnection } from "../_shared/providers/persist.ts";
 import { MonoError } from "../_shared/providers/mono/client.ts";
@@ -65,11 +66,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // The redirect target is where Mono returns the user after the widget.
     // It must be a URL we control; the client supplies its own origin.
     const redirectUrl = body.redirect_url;
-    if (!redirectUrl || !isAllowedRedirect(redirectUrl)) {
+    if (!redirectUrl || !isAllowedRedirect(redirectUrl, appScheme())) {
       return errResponse(
         400,
         "INVALID_INPUT",
-        "redirect_url is required and must be an http(s) URL.",
+        "redirect_url is required and must be an https URL or the app's own link.",
         false,
       );
     }
@@ -220,14 +221,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 });
 
 /**
- * Only http(s) redirects are accepted. The value is echoed to Mono, so a
- * `javascript:` or `data:` URL must never reach it.
+ * The app's custom URL scheme (app.json `scheme`), used to validate native deep
+ * links. Read per-request rather than at module scope so a redeploy that changes
+ * the secret takes effect without a restart, and so a missing secret fails
+ * closed instead of throwing at import time.
  */
-function isAllowedRedirect(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:";
-  } catch {
-    return false;
-  }
+function appScheme(): string {
+  return Deno.env.get("APP_SCHEME") ?? "";
 }
