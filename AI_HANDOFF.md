@@ -6,33 +6,31 @@
 cross-bank transaction reconciliation, budgeting, and read-only financial
 insights. Repo: `github.com/onyebuchidaniel60/Reconcile`.
 
-**Current phase:** Phase 10B close — **COMPLETE**. Frontend layer
-(Phases 3–10) is complete. Phase 11 has not started.
+**Current phase:** Phase 11 — Mono integration — **implementation complete,
+live webhook verification pending operator setup**. The frontend layer
+(Phases 3–10) remains closed and untouched. Phase 12 has not started.
 
 | Fact | Value |
 |---|---|
-| Last verified APK (operator-verified on device) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` |
+| Last verified APK (operator-verified on device) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` (Phase 10B.5) |
+| Phase 11 preview APK (**not** yet operator-verified) | `https://expo.dev/artifacts/eas/AJeqqSe01U6pxrzkbwiJM2C_DjSH1nZeK0IikiPbp-A.apk` |
 | Live web alias | `https://reconcile-uhhh2.vercel.app` |
-| Last phase commit (Phase 10B.5) | `53d4c0e fix: unify home and budget month spend; wire home month selector (Phase 10B.5)` |
-| Phase 10B close — plan status correction | `cbe00ae` — `docs: update implementation plan status after phase 10b.5` |
-| Phase 10B close — skill rewrite | `6716b2c` — `docs: rewrite SKILL_FRONTEND_DESIGN.md v1 from accumulated evidence` |
-| `demo-v1` tag | `991851b` (unchanged since the demo phase closed) |
+| Phase 11 commit | `83eb253` — `feat: add mono financial data provider (Phase 11)` |
+| Phase 10B close — plan status correction | `cbe00ae` |
+| Phase 10B close — skill rewrite | `6716b2c` |
+| `demo-v1` tag | `b05b4c2` (**note:** the handoff previously claimed `991851b`; the actual tag points at `b05b4c2`) |
 | Source-of-truth doc index | "Source-of-truth document index", immediately below |
 | Environment / credentials | "Environment state", immediately below |
 
-> This file's most recent update is `git log -n 1 -- AI_HANDOFF.md`. The two
-> `cbe00ae`/`6716b2c` commits above are the Phase 10B close; the commit
-> containing this block is a docs-only follow-up, so the hash of the latter is
-> deliberately not hard-coded here.
+> This file's most recent update is `git log -n 1 -- AI_HANDOFF.md`.
 
 **What the next session does.** Read this file top to bottom. Confirm state
-with `git fetch origin && git status` (tree should be clean, HEAD should be the
-handoff commit). The frontend layer is closed and gated: do not reopen it
-without a stated reason. The next task is **Phase 11 — Mono integration**,
-briefed in "Phase 11 — Mono integration" below. Phase 11 requires Mono business
-onboarding/KYB and sandbox keys. If they are not available, implement the
-adapter against a mock and explicitly flag live verification as pending — do
-not silently narrow the phase, and do not claim a live loop that was not run.
+with `git fetch origin && git status`. The next task is **Phase 12 —
+RevenueCat monetization** (`IMPLEMENTATION_PLAN.md` v3), **but** do not start it
+until the operator has completed the Phase 11 operator-setup list in the
+"Phase 11 checkpoint" section below (register the webhook with Mono, set
+`MONO_WEBHOOK_SECRET`, verify the sandbox loop on the installed APK, and flip
+both feature flags). Those are deliberately sequenced before Phase 12.
 
 Everything below this block is per-phase history, newest checkpoint at the
 bottom of that run of entries. Historical sections are preserved verbatim as
@@ -79,13 +77,32 @@ committed. Holds:
 - `EXPO_TOKEN` — not present in this repo's `.env.local`; EAS auth is via the
   logged-in CLI session (`buchi208`). Set one if a non-interactive flow needs
   it.
+- `EXPO_PUBLIC_MONO_PUBLIC_KEY` — added in Phase 11 (`test_pk_…`). Publishable
+  widget identifier, **not** a secret.
 
 **`.env.production`** — committed. Contains `EXPO_PUBLIC_*` values only. Never
 add a server-only value here; the web bundle inlines this file's contents.
+Phase 11 added `EXPO_PUBLIC_FEATURE_MONO=false` and
+`EXPO_PUBLIC_MONO_PUBLIC_KEY`.
+
+**Supabase Edge Function secrets** (`npx supabase secrets list`) — server-only,
+never in any env file:
+
+| Secret | State (Phase 11) |
+|---|---|
+| `MONO_SECRET_KEY` | **Set and verified working** — a live authenticated `GET /v3/institutions` returns 200. Note it is a bare 64-char hex string with **no** `test_sk_`/`live_sk_` prefix. |
+| `MONO_WEBHOOK_SECRET` | **NOT SET.** Copy from the webhook config in the Mono dashboard. Until then `mono-webhook` fails closed (503). |
+| `FEATURE_MONO` | **NOT SET** (off). Server-side half of the Phase 11 gate. |
+
+`mono-webhook` must keep `verify_jwt = false` in `supabase/config.toml`: Mono
+sends no Supabase JWT, only the `mono-webhook-secret` header.
 
 **Browser tooling** — Playwright 1.63.0 + headless Chromium, self-provisioned
-each session (no MCP or computer-use tool exists in this environment).
-Verified working in the Phase 10B.5 session at Chromium 153.0.8010.12.
+each session (no MCP or computer-use tool exists in this environment). Verified
+in the Phase 11 session at Chromium 153.0.8010.12. Provision with
+`npm install --no-save playwright@1.63.0` then `npx playwright install chromium`
+— `--no-save` keeps `package.json` untouched, which is the established
+convention here.
 
 **Native tooling** — EAS CLI 24.8.0, logged in as `buchi208`. `eas.json` and
 `app.json` are configured for `com.onyebuchidaniel.reconcile`. Builds are
@@ -187,32 +204,359 @@ skill's §12).
 | 9. 3.6:1 starburst residual | Phase 10A KNOWN RESIDUAL |
 | 10. Worklet/non-worklet crash | Phase 8 native crash + "Native crash resolved" |
 
-## Phase 11 — Mono integration (next; frontend layer is closed)
+## Phase 11 — Mono integration (IMPLEMENTATION COMPLETE; live verification pending operator setup)
 
-- Replaces the demo provider with the real Mono adapter, behind the
-  **unchanged** `FinancialProvider` interface. Do not change the interface.
-- Mono client lives in Supabase Edge Functions only — never in the client.
-- `MONO_SECRET_KEY` is set as a **Supabase Edge Function secret**. Never in
-  `.env.local`, never in `.env.production`, never in the client bundle.
-- **Institution discovery:** dynamic from Mono, not hard-coded.
-- **Connection session:** server-side creation; client opens Mono Connect UI.
-- **Account persistence:** normalized per the existing schema
-  (`bank_connections`, `bank_accounts`).
-- **Webhook:** authenticity verification (Mono signature) + idempotency via a
-  unique provider event key. **Note:** no `provider_events` table exists yet —
-  the current migrations (`000001`–`000004`) create `sync_runs` for sync
-  bookkeeping but nothing for webhook events. Phase 11 must add that table
-  (and its RLS) as part of the phase.
-- **Reauth handling:** Mono reports `reauth_required`; connection status
-  updates and the user is prompted to reconnect.
-- **Verification:** a live sandbox test proving the full loop (connect →
-  sync → review → categorize → budget updates) against Mono sandbox, on both
-  web and native.
-- **Real-world dependency:** Mono business onboarding/KYB and sandbox keys must
-  be available before this phase can complete. If they are not, implement the
-  adapter and test against a mock, and explicitly flag live verification as
-  pending.
-- Commit: `feat: add mono financial data provider (Phase 11)`.
+**Status: implementation complete. Live webhook verification pending operator
+Mono dashboard setup. Native smoke test pending operator installation.**
+
+Phase 11 replaced the demo provider with a real Mono adapter behind the frozen
+`FinancialProvider` contract. **Phase 12 not started.**
+
+### Commits
+
+| Commit | Change |
+|---|---|
+| `83eb253` | `feat: add mono financial data provider (Phase 11)` |
+| this commit | `docs: update handoff after phase 11` — this file |
+
+### The provider abstraction did not exist before this phase
+
+The brief and `AI_HANDOFF.md` both described `FinancialProvider` as existing and
+frozen. It did not exist **as code** — only as a TypeScript block in
+`ARCHITECTURE.md` §3. Verified before building:
+
+- `grep FinancialProvider src/ app/ supabase/` → zero matches in any `.ts`/`.tsx`.
+- No `src/providers/`, no `_shared/providers/`.
+- No file named `*provider*` anywhere, **ever** — `git log --all --diff-filter=AD
+  -- '*provider*'` is empty across all branches.
+- `git log --all -S 'FinancialProvider'` returns four commits, all docs-only.
+- The Phase 2 commit `21afdd8 "feat: core demo slice 1 — auth, demo provider,
+  …"` has no provider file; "demo provider" meant the inline Edge Function
+  logic plus `_shared/demo.ts`.
+
+So the interface was transcribed **verbatim** from `ARCHITECTURE.md` §3 into
+`supabase/functions/_shared/providers/types.ts` and is now frozen there. The
+Phase 2 premise that a provider abstraction had shipped was wrong; the phase 2
+work was the demo fixture, not an abstraction.
+
+### Provider module structure
+
+Server-side (Deno), the only place a provider may exist:
+
+| Path | Role |
+|---|---|
+| `_shared/providers/types.ts` | The frozen `FinancialProvider` interface + `ProviderCapabilities`, `Institution`, `ProviderAccount`, `ProviderTransaction(Page)`, `ConnectionSession`, `RefreshResult` |
+| `_shared/providers/registry.ts` | provider id → adapter; country → provider (`NG → [mono, demo]`) |
+| `_shared/providers/demo/adapter.ts` | Demo adapter over the existing `_shared/demo.ts` fixture |
+| `_shared/providers/mono/adapter.ts` | Mono adapter — the only other file that may name Mono fields |
+| `_shared/providers/mono/client.ts` | Mono HTTP client. Pure I/O |
+| `_shared/providers/mono/normalize.ts` | Payload → normalised shape. **Pure** |
+| `_shared/providers/mono/webhook.ts` | Webhook parse/verify/hash + `MonoError`. **Pure** |
+| `_shared/providers/persist.ts` | The only module that knows schema column names |
+| `_shared/ingest.ts` | Ledger persist + internal-transfer pairing + review backfill, shared by both providers |
+
+Client-side, metadata only — the client never calls a provider:
+
+| Path | Role |
+|---|---|
+| `src/providers/types.ts` | Re-exports the server types (see note) |
+| `src/providers/capabilities.ts` | Static per-provider capability descriptor |
+| `src/providers/registry.ts` | Country → providers; `getProvider` |
+
+> **Note on the types duplication.** The plan proposed mirroring the type file
+> by hand with a "keep in sync manually" header. This repo already has the
+> opposite convention: app screens import pure modules straight out of
+> `supabase/functions/_shared/` (`app/budget.tsx:5`, `src/lib/db.ts:9`,
+> `src/components/Donut.tsx:9`). So there is **one** canonical file and
+> `src/providers/types.ts` re-exports it. A second hand-maintained copy would
+> only create drift.
+
+### Mono API contract — verified, not remembered
+
+Every endpoint was checked against Mono's current docs *and* confirmed with a
+live authenticated request using the operator's key (`GET /v3/institutions`
+returned HTTP 200).
+
+| Operation | Endpoint |
+|---|---|
+| Connect Link | `POST /v2/accounts/initiate` → `data.mono_url` |
+| Exchange code | `POST /v2/accounts/auth` `{code}` → `data.id` |
+| Account details | `GET /v2/accounts/{id}` → `data.account`, `data.meta.data_status` |
+| Transactions | `GET /v2/accounts/{id}/transactions` (`page`, `start`, `end`) |
+| Institutions | `GET /v3/institutions?scope=financial_data` |
+| Unlink | `POST /v2/accounts/{id}/unlink` (id is a **path** segment, not a body field) |
+
+Four corrections to the original brief, each verified:
+
+1. **"The sandbox and live hosts differ"** — they do not. Mono's own index
+   states: *"Sandbox and Production share the same base URL; the key type (test
+   vs live) determines the environment."* One host, `api.withmono.com`. The
+   operator's key is a bare 64-char hex string with no `test_sk_`/`live_sk_`
+   prefix and authenticates fine.
+2. **"Verify the Mono webhook signature"** — Mono Connect has **no signature**.
+   Its documented check is a shared secret in the `mono-webhook-secret` header,
+   compared against the dashboard-generated value. The HMAC scheme
+   (`Mono-Signature: t=…,v1=…`) documented on `docs.mono.la` belongs to a
+   different, Colombian product and is deliberately **not** implemented — an
+   unimplemented scheme cannot be mistaken for a working one.
+3. **"Create `src/providers/mono/adapter.ts`"** — that path is in the client
+   bundle and every interface method is server-side. All six methods are
+   implemented server-side; `src/providers/*` holds metadata only.
+4. **Webhook path** — `ARCHITECTURE.md` §8 says `/functions/v1/mono/webhook`.
+   The Supabase CLI rejects nested slugs (`InvalidFunctionDeploySlugError`,
+   `^[A-Za-z][A-Za-z0-9_-]*$`). The deployed name is **`mono-webhook`**.
+
+Two Mono behaviours that shaped the design:
+
+- **NGN is returned in kobo**, i.e. already integer minor units. No conversion.
+- **Connect Link completes via webhook, not a redirect code.** Mono's index:
+  *"use the initiate endpoint to get a `mono_url`, then wait for
+  `mono.events.account_connected` and `mono.events.account_updated` webhooks
+  before calling data endpoints."* The query-parameter name Mono appends to
+  `redirect_url` is **not documented anywhere** (checked `llms.txt`,
+  Connect Link, SDK and Authorization pages). Rather than invent one, the flow
+  uses the documented channel: `bank-connect-session` reserves a `pending`
+  `bank_connections` row keyed by an opaque `meta.ref`, and the
+  `account_connected` webhook claims that row and rewrites it with the real
+  account id. The widget `postMessage`/code path is also handled
+  (`POST /v2/accounts/auth` is documented) but is best-effort.
+
+Event names handled: `mono.events.account_connected` (plus `account_linked` as
+an accepted alias — **not** a real Mono name), `account_updated`,
+`account_reauthorized`, `account_unlinked`. Anything else is recorded and
+acknowledged with 200 so Mono stops redelivering.
+
+### Migration 000005 — applied and verified
+
+`supabase/migrations/000005_provider_events.sql` — applied with
+`npx supabase db push`. `db diff --linked` **could not run** (needs Docker,
+unavailable on this machine); verified behaviourally against the linked project
+with the service-role and anon keys instead:
+
+| Check | Result |
+|---|---|
+| Insert (service role) | 201, all columns as specified, `status` defaults to `received` |
+| Anon read with a row present | `[]` → RLS blocks client reads |
+| Anon insert | 401 `new row violates row-level security policy` |
+| Duplicate `(provider_id, provider_event_id)` | 409 unique violation |
+| Invalid `status` | 400 check violation |
+
+`npx supabase db push` also re-applied `000003`/`000004`; both are idempotent
+(`add column if not exists`, `drop policy if exists`) and harmless. The remote
+migration table had not recorded them — pre-existing bookkeeping drift, not
+caused by this phase.
+
+### Edge Functions — all deployed and ACTIVE
+
+`bank-connect-session`, `bank-exchange-code`, `bank-sync`, `bank-disconnect`,
+`mono-webhook` (+ `ai-ask` redeployed). `mono-webhook` has `verify_jwt = false`
+in `supabase/config.toml` because **Mono sends no JWT**; the shared secret is the
+only authenticity check, and the gateway's JWT check would otherwise reject
+every genuine delivery.
+
+Live probes against the linked project:
+
+- `POST mono-webhook` with the flag off → `404 NOT_FOUND`.
+- `bank-connect-session`, `bank-exchange-code`, `bank-sync` unauthenticated
+  → `401` (gateway).
+- Flag default is **off in both transports**, independently:
+  `EXPO_PUBLIC_FEATURE_MONO` (client bundle) and `FEATURE_MONO` (Edge Function
+  secret, currently unset).
+
+### What is NOT verified
+
+- **Live webhook verification — not run.** `MONO_WEBHOOK_SECRET` is not set
+  and the endpoint is not registered with Mono. The function is implemented and
+  deployed but **fails closed** (503 `WEBHOOK_NOT_CONFIGURED`) until the secret
+  exists.
+- **No live Connect Link was completed.** Completing it needs a human to log
+  into a real sandbox bank. So `bank-exchange-code`, the account-persistence
+  path and a Mono `bank/sync` have **not** been exercised against live Mono
+  data. Their Mono *calls* are verified only to the extent the docs and the one
+  live probe establish.
+- **The Mono widget was never loaded in a browser**, because the flag is off.
+
+## Phase 11 — operator setup required before Phase 12
+
+1. Register the deployed endpoint as a webhook in the Mono dashboard:
+   `https://ztfqckfdvchcqksluqri.supabase.co/functions/v1/mono-webhook`
+   Subscribe to `account_updated`, `account_connected`, `account_unlinked`
+   (and `account_reauthorized`).
+2. Copy the webhook secret Mono displays.
+3. `npx supabase secrets set MONO_WEBHOOK_SECRET=<value>`
+4. Confirm with `npx supabase secrets list`.
+   **Until this is done the webhook rejects every incoming event. That is the
+   correct fail-closed behaviour, not a bug.**
+5. Set the server gate: `npx supabase secrets set FEATURE_MONO=true`.
+6. Flip the client gate in `.env.production`:
+   `EXPO_PUBLIC_FEATURE_MONO=true` (currently `false`), then rebuild/redeploy.
+7. Install the preview APK and walk the loop: connect a real bank → account
+   appears → sync pulls transactions → review → categorize → budget.
+
+### Phase 11 preview APK
+
+| | |
+|---|---|
+| APK | `https://expo.dev/artifacts/eas/AJeqqSe01U6pxrzkbwiJM2C_DjSH1nZeK0IikiPbp-A.apk` |
+| Build page | `https://expo.dev/accounts/buchi208/projects/reconcile/builds/45da1570-07e0-43a4-8715-54fdbcf6946e` |
+| Built from | `83eb253` (Phase 11), Expo SDK 57.0.0, preview profile |
+| EAS queue | ~25 min in queue, ~15 min build |
+
+**Native smoke test pending operator installation.**
+
+Because the APK was built while `EXPO_PUBLIC_FEATURE_MONO=false`, the
+"Connect a real bank" button is **disabled on it** and "Connect a real bank"
+will not open the widget until the operator flips the flag and a new build is
+produced. To test the connect flow on-device: set the flag, then rebuild.
+
+Operator checklist on device: the Demo screen's "Connect a real bank" is
+enabled → opens the Mono widget in a WebView → pick a sandbox bank and log in →
+the app returns and syncs → the account appears in Settings → transactions land
+in Activity → review → categorize → budget updates. Then re-enable
+`bank/sync` from the pull-to-refresh path and confirm idempotency (a second
+sync adds zero transactions).
+
+## Phase 11 — testing harness
+
+- `scripts/create-test-user.cjs` creates a pre-confirmed Supabase user via the
+  admin API. Needed because **Supabase rejects `example.com` addresses and
+  rate-limits signup emails**, so agent-as-user passes cannot use the normal
+  signup flow. Reads `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/
+  `PASS_EMAIL`/`PASS_PASSWORD` from the environment; refuses any project URL
+  that is not `*.supabase.co`; exits non-zero on failure. **Future phases
+  should reuse it rather than write a one-off.**
+- `scripts/mono-web-pass.cjs` is the Playwright pass (screenshot + `report.txt`
+  evidence into `docs/browser-tools/phase11-shots/`). Playwright 1.63.0 +
+  Chromium 153.0.8010.12, installed with `npm install --no-save playwright@1.63.0`
+  so `package.json` is untouched.
+- The Phase 10A–10B.5 passes ran before this harness existed and used an
+  ephemeral approach. Phase 11 onward uses these scripts.
+
+## Phase 11 — time-dependent test failures (fixed)
+
+Six screen-test failures were **pre-existing and unrelated to Mono**. They
+reproduced at `9a7557f` with this phase's work stashed. The Home/Budget/Insights
+fixtures hard-coded September 2026 dates (`period_start: "2026-09-01"`,
+`occurred_at: "2026-09-14"`) while the screens derive "this month" from the real
+clock — so the suite silently rotted at the 2026-10-01 month boundary and
+reported ₦0.00 while the product was fine.
+
+Fixed in `tests/screens.test.tsx` and `tests/screens9.test.tsx` with relative
+fixtures (`THIS_MONTH_START`, `THIS_MONTH_10AM`, `THIS_MONTH_14AM`,
+`PREV_MONTH_11AM`, `NEXT_MONTH_START`) and derived labels:
+
+- `Home screen > renders greeting, hero, budget, rows, and pill with real data`
+- `Home screen > shows the same monthly spend Budget reports (Phase 10B.5, Fix A)`
+- `Budget screen > reports month spend net of refunds (Phase 10B.5, Fix A)`
+- `Insights screen > renders the insight cards with real numbers`
+- `Insights screen > shows the first-month card without history`
+- `Insights screen > labels the top merchant with the user's display name (Phase 10A.5, Fix 7)`
+
+The trap worth remembering: **`app/insights.tsx` `monthBounds()` ends the
+current month at `now`**, so a fixture dated later in the month is treated as
+*future-dated* and totals ₦0.00. Insights therefore uses
+`THIS_MONTH_TO_DATE` (local midnight today), with explicit guards in
+`tests/screens9.test.tsx > time-independent fixtures`. The pure-formatter
+assertions (`formatRowDate`, `formatPeriodLabel`, `monthSampleDays`) keep their
+absolute dates on purpose — a fixed input must produce a fixed output.
+
+**Lesson:** a fixture coupled to the wall clock is a time bomb. Any screen
+test that asserts "this month" must derive its dates from `new Date()`.
+
+## Phase 11 — files added
+
+```
+supabase/migrations/000005_provider_events.sql
+supabase/functions/mono-webhook/index.ts
+supabase/functions/bank-exchange-code/index.ts
+supabase/functions/_shared/flags.ts
+supabase/functions/_shared/ingest.ts
+supabase/functions/_shared/rateLimit.ts
+supabase/functions/_shared/providers/types.ts
+supabase/functions/_shared/providers/registry.ts
+supabase/functions/_shared/providers/persist.ts
+supabase/functions/_shared/providers/demo/adapter.ts
+supabase/functions/_shared/providers/mono/adapter.ts
+supabase/functions/_shared/providers/mono/client.ts
+supabase/functions/_shared/providers/mono/normalize.ts
+supabase/functions/_shared/providers/mono/webhook.ts
+app/connect-bank.tsx
+src/lib/flags.ts
+src/lib/monoWidget.ts
+src/providers/{types,capabilities,registry,index}.ts
+scripts/create-test-user.cjs
+scripts/mono-web-pass.cjs
+tests/mono.test.ts
+tests/monoWidget.test.ts
+docs/browser-tools/phase11-shots/*
+```
+
+Modified: `supabase/config.toml`, `.env.production`, `.env.example`,
+`tsconfig.json`, `eslint.config.js`, `package.json` (+`react-native-webview`),
+`app/demo.tsx`, `app/settings.tsx`, `app/_layout.tsx`, `src/lib/db.ts`,
+`tests/screens.test.tsx`, `tests/screens9.test.tsx`, and the three existing
+`bank-*` Edge Functions.
+
+`tsconfig.json` and `eslint.config.js` each gained a small entry: the tsconfig
+`include` lists the new pure `_shared/providers/*` modules so they are
+type-checked, and eslint needs Node globals for `scripts/**/*.cjs`.
+
+### Checks
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | exit 0 |
+| `npx eslint .` | exit 0 |
+| `npm test` | exit 0 — **261 passed, 0 failed**, check:tokens 0 |
+| `npx expo export -p web` | success, 21 routes incl. `/connect-bank` |
+| `npx supabase functions list` | 6 ACTIVE |
+| Secret scan (`app/ src/ dist/ supabase/ tests/ scripts/ docs/`) | 0 occurrences of the secret; no `MONO_SECRET_KEY`/`mono-sec-key` reference in any client file |
+| `.env.local` | gitignored (`.gitignore:49`), absent from `git status` |
+| `npx supabase db diff --linked` | **could not run** — requires Docker |
+
+### Web verification (Playwright, Chromium 153.0.8010.12, 390×844)
+
+Signed in, ran the Phase 10 flows, screenshot evidence in
+`docs/browser-tools/phase11-shots/`:
+
+- "Connect a real bank" is rendered, `aria-disabled=true`, shows "Coming soon",
+  and clicking it does **not** navigate — the gate is correctly closed with
+  `EXPO_PUBLIC_FEATURE_MONO=false`.
+- "Enter Demo Mode" still routes to `/home`; the demo path is unaffected.
+- `/home`, `/activity`, `/budget`, `/insights`, `/review`, `/settings` all
+  render with no error state and **zero console errors**. (`/budget` shows its
+  normal "No budget yet" empty state for a fresh user.)
+- `/connect-bank` with the flag off shows the "not available yet" notice and
+  renders no iframe.
+- The reauth card is correctly absent — this user has no reauth state.
+
+**Limitation:** the Mono widget itself was never loaded in a browser, because
+the flag is off and the Connect Link needs a human to complete a sandbox bank
+login. The **native APK pass is the authoritative verification** of the connect
+flow. The web pass verifies the gate, the route, the demo path and the absence
+of regressions.
+
+## Phase 11 — residual gaps and known unknowns
+
+1. `MONO_WEBHOOK_SECRET` unset; webhook not registered; **no live webhook test
+   was run** (the operator directed this be deferred).
+2. **No live Connect Link completion**, so the post-connect path (exchange code,
+   account persistence, Mono `bank/sync`) is unexercised against live data.
+3. **The redirect query-parameter name is undocumented.** If the native pass
+   shows the widget navigating to the redirect with a code in it, add that
+   parameter to `src/lib/monoWidget.ts` — the webhook path is authoritative
+   regardless, so nothing depends on it.
+4. `MonoError.code` values are mapped to HTTP statuses per call site; a code
+   set that later proves too coarse is a Phase 14 concern.
+5. Webhook failure rows stay `failed` and visible rather than being retried
+   forever — deliberate, but a real product needs an operator-facing retry.
+6. `ingest.ts` reads the whole per-user ledger for transfer pairing. Fine at
+   MVP volume; a large product must page it.
+7. `.expo/types/router.d.ts` is generated and gitignored. It only regenerates
+   when the Expo dev server boots; if `tsc` reports an unknown route, run
+   `node_modules\.bin\expo.cmd start --port 8099` and load the page once.
+8. The dev server writes resolved env values (including secrets) to
+   `.expo/dev/logs/start.log`. Gitignored, but worth knowing.
 
 ## Phase 10B close checkpoint (frontend layer complete)
 
@@ -1565,11 +1909,17 @@ Reconcile is a Nigeria-first mobile personal-finance app focused on cross-bank t
 - Visual identity follows the supplied high-contrast black/white/yellow reference with coral/secondary accents.
 
 ## External setup dependencies
-- Mono business onboarding/KYB and sandbox/live credentials.
-- Current institution coverage must be fetched dynamically.
-- Supabase projects and environment secrets.
-- RevenueCat project/store products.
-- OpenAI API key before AI phase.
+- **Mono (Phase 11, partially satisfied).** Sandbox secret key is set as the
+  `MONO_SECRET_KEY` Edge Function secret and works. **Still outstanding:** the
+  `MONO_WEBHOOK_SECRET` Edge Function secret, webhook registration in the Mono
+  dashboard, and the `FEATURE_MONO` gate.
+- Current institution coverage must be fetched dynamically. Done in Phase 11:
+  `GET /v3/institutions?scope=financial_data`, filtered by country, never
+  hard-coded.
+- Supabase projects and environment secrets. Project ref
+  `ztfqckfdvchcqksluqri`.
+- RevenueCat project/store products. **Phase 12.**
+- OpenAI API key before AI phase. **Phase 13.**
 - Apple/Google developer accounts and store review.
 - Final product-name availability check.
 
@@ -1584,30 +1934,30 @@ Use:
 `IMPLEMENT → TEST → INSPECT → FIX → COMMIT → CHECKPOINT → STOP`
 
 ## Current phase
-**Phase 10B close — COMPLETE. Frontend layer (Phases 3–10) complete.** Phase 11
-has not started. The operator verified the Phase 10B.5 APK on device, and the
-close delivered `IMPLEMENTATION_PLAN.md` status correction (`cbe00ae`) plus
-`SKILL_FRONTEND_DESIGN.md` v1 (`6716b2c`).
+**Phase 11 — Mono integration — implementation COMPLETE. Live webhook
+verification pending operator setup. Native smoke test pending operator
+installation. Phase 12 not started.**
 
-This section was previously "Current phase: Phase 1". That was stale and
-superseded — see "Current state" at the top of this file, which is
-authoritative.
+Delivered in `83eb253`: migration `000005_provider_events`; the frozen
+`FinancialProvider` contract, registry and demo/Mono adapters; the Mono client
+split into pure `normalize.ts`/`webhook.ts` plus I/O `client.ts`; five Edge
+Functions deployed; the WebView Connect route; reauth surfacing in Settings; the
+`EXPO_PUBLIC_FEATURE_MONO` / `FEATURE_MONO` gates (both off); 48 new unit tests;
+and a fix for six pre-existing time-dependent screen-test failures.
+
+This section was previously "Current phase: Phase 1", then "Phase 10B close".
+Both were stale and superseded — see "Current state" at the top of this file,
+which is authoritative.
 
 ## Next exact task
-**Phase 11 — Mono integration.** Replace the demo provider with the real Mono
-adapter behind the **unchanged** `FinancialProvider` interface. Full brief in
-"Phase 11 — Mono integration" above and `IMPLEMENTATION_PLAN.md` §Phase 11.
+**Operator setup for Phase 11**, in this order — see "Phase 11 — operator setup
+required before Phase 12" for the exact commands. Register `mono-webhook` with
+Mono, set `MONO_WEBHOOK_SECRET`, set `FEATURE_MONO=true`, flip
+`EXPO_PUBLIC_FEATURE_MONO=true`, install the preview APK and walk the loop.
 
-**Blocking external dependency.** Mono business onboarding/KYB and sandbox keys
-must be available. If they are not, Phase 11 must implement the adapter and
-test it against a mock, and must **explicitly flag live verification as
-pending** — in the phase report, in `AI_HANDOFF.md`, and in the commit
-message. Do not claim a live sandbox loop that was not run, and do not silently
-narrow the phase.
-
-Phase 11 must also add the missing `provider_events` table and its RLS (no such
-table exists; migrations `000001`–`000004` create `sync_runs` only) so webhook
-processing can be idempotent.
+Then, and only then: **Phase 12 — RevenueCat monetization** (§Phase 12 of
+`IMPLEMENTATION_PLAN.md`; `ARCHITECTURE.md` §10). Do not start Phase 12 before
+the operator setup above, and do not start Phase 13.
 
 Phase 10B close is done and must not be reopened without a stated reason.
 Before changing code in any phase:
