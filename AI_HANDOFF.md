@@ -6,18 +6,17 @@
 cross-bank transaction reconciliation, budgeting, and read-only financial
 insights. Repo: `github.com/onyebuchidaniel60/Reconcile`.
 
-**Current phase:** Phase 11 — Mono integration — **implementation complete,
-live webhook verification pending operator setup**. The frontend layer
-(Phases 3–10) remains closed and untouched. Phase 12 has not started.
+**Current phase:** Phase 11 — Mono integration — **live connect path verified
+against Mono sandbox; webhook acceptance verification pending one operator
+command**. The frontend layer (Phases 3–10) remains closed and untouched.
+**Phase 12 has not started.**
 
 | Fact | Value |
 |---|---|
 | Last verified APK (operator-verified on device) | `https://expo.dev/artifacts/eas/x9OmdVZTcOFENaOOEC4CAbIjsqr7n0SpSevVOPyvay0.apk` (Phase 10B.5) |
-| Phase 11 preview APK (**not** yet operator-verified) | `https://expo.dev/artifacts/eas/AJeqqSe01U6pxrzkbwiJM2C_DjSH1nZeK0IikiPbp-A.apk` |
+| Phase 11 preview APK, **flag ON** (**not** operator-verified) | `https://expo.dev/artifacts/eas/YPG8ZY62ea8eoEZBmA2x4pm6VeF75vkcevcU2rkefso.apk` (from `4ea3a3c`) |
 | Live web alias | `https://reconcile-uhhh2.vercel.app` |
-| Phase 11 commit | `83eb253` — `feat: add mono financial data provider (Phase 11)` |
-| Phase 10B close — plan status correction | `cbe00ae` |
-| Phase 10B close — skill rewrite | `6716b2c` |
+| Phase 11 commits | `83eb253` feature · `43da122` handoff · `681134c` operator flag flip · `4ea3a3c` web-widget fix |
 | `demo-v1` tag | `b05b4c2` (**note:** the handoff previously claimed `991851b`; the actual tag points at `b05b4c2`) |
 | Source-of-truth doc index | "Source-of-truth document index", immediately below |
 | Environment / credentials | "Environment state", immediately below |
@@ -25,12 +24,12 @@ live webhook verification pending operator setup**. The frontend layer
 > This file's most recent update is `git log -n 1 -- AI_HANDOFF.md`.
 
 **What the next session does.** Read this file top to bottom. Confirm state
-with `git fetch origin && git status`. The next task is **Phase 12 —
-RevenueCat monetization** (`IMPLEMENTATION_PLAN.md` v3), **but** do not start it
-until the operator has completed the Phase 11 operator-setup list in the
-"Phase 11 checkpoint" section below (register the webhook with Mono, set
-`MONO_WEBHOOK_SECRET`, verify the sandbox loop on the installed APK, and flip
-both feature flags). Those are deliberately sequenced before Phase 12.
+with `git fetch origin && git status`. Both Mono feature flags are now **ON**
+(`EXPO_PUBLIC_FEATURE_MONO=true` in `.env.production`, `FEATURE_MONO=true` as an
+Edge Function secret). Before Phase 12, the operator still needs to run
+`scripts/mono-webhook-verify.cjs` (one command, see "Phase 11 checkpoint") and
+complete the native smoke test. **Phase 12 — RevenueCat monetization** is next
+once those are done.
 
 Everything below this block is per-phase history, newest checkpoint at the
 bottom of that run of entries. Historical sections are preserved verbatim as
@@ -88,11 +87,19 @@ Phase 11 added `EXPO_PUBLIC_FEATURE_MONO=false` and
 **Supabase Edge Function secrets** (`npx supabase secrets list`) — server-only,
 never in any env file:
 
-| Secret | State (Phase 11) |
+| Secret | State |
 |---|---|
-| `MONO_SECRET_KEY` | **Set and verified working** — a live authenticated `GET /v3/institutions` returns 200. Note it is a bare 64-char hex string with **no** `test_sk_`/`live_sk_` prefix. |
-| `MONO_WEBHOOK_SECRET` | **NOT SET.** Copy from the webhook config in the Mono dashboard. Until then `mono-webhook` fails closed (503). |
-| `FEATURE_MONO` | **NOT SET** (off). Server-side half of the Phase 11 gate. |
+| `MONO_SECRET_KEY` | **Set and verified working** — a live authenticated `GET /v3/institutions` returns 200, and `POST /v2/accounts/initiate` returns a real Connect Link. Note it is a bare 64-char hex string with **no** `test_sk_`/`live_sk_` prefix. |
+| `MONO_WEBHOOK_SECRET` | **Set by the operator.** Value no longer readable by an agent — see the masking note below. |
+| `FEATURE_MONO` | **`true`** — the server half of the Phase 11 gate. It was unset when the client flag was first flipped, which made every Mono route return 404 while the UI showed the button enabled. |
+
+> **Secret masking (learned Phase 11 close-out).** `npx supabase secrets list`
+> and the Supabase Management API `GET /v1/projects/{ref}/secrets` now return an
+> identical 64-char hex placeholder for *every* secret. Earlier in the session
+> they returned real values (`MONO_SECRET_KEY` was read and used successfully
+> against Mono's API). So `secrets list` can confirm **presence**, never
+> **value**. Do not trust a length or a value from it. Anything that needs a
+> secret's value must have it supplied by the operator.
 
 `mono-webhook` must keep `verify_jwt = false` in `supabase/config.toml`: Mono
 sends no Supabase JWT, only the `mono-webhook-secret` header.
@@ -204,7 +211,7 @@ skill's §12).
 | 9. 3.6:1 starburst residual | Phase 10A KNOWN RESIDUAL |
 | 10. Worklet/non-worklet crash | Phase 8 native crash + "Native crash resolved" |
 
-## Phase 11 — Mono integration (IMPLEMENTATION COMPLETE; live verification pending operator setup)
+## Phase 11 — Mono integration (IMPLEMENTATION COMPLETE; live connect path verified; webhook acceptance pending one operator command)
 
 **Status: implementation complete. Live webhook verification pending operator
 Mono dashboard setup. Native smoke test pending operator installation.**
@@ -217,7 +224,10 @@ Phase 11 replaced the demo provider with a real Mono adapter behind the frozen
 | Commit | Change |
 |---|---|
 | `83eb253` | `feat: add mono financial data provider (Phase 11)` |
-| this commit | `docs: update handoff after phase 11` — this file |
+| `43da122` | `docs: update handoff after phase 11` |
+| `681134c` | `chore: enable mono feature flag for sandbox verification` (operator) |
+| `4ea3a3c` | `fix: host the mono connect widget in an iframe on web` |
+| this commit | `docs: update handoff after phase 11 close-out` — this file |
 
 ### The provider abstraction did not exist before this phase
 
@@ -365,56 +375,163 @@ Live probes against the linked project:
 
 ### What is NOT verified
 
-- **Live webhook verification — not run.** `MONO_WEBHOOK_SECRET` is not set
-  and the endpoint is not registered with Mono. The function is implemented and
-  deployed but **fails closed** (503 `WEBHOOK_NOT_CONFIGURED`) until the secret
-  exists.
+- **Live webhook acceptance — still not run.** `MONO_WEBHOOK_SECRET` is now set
+  and the endpoint is registered, but the secret is masked in every agent-visible
+  API, so acceptance of a correctly authenticated event cannot be proven by an
+  agent. See "Webhook acceptance — ONE operator command still required" below.
+  Bad and missing secrets are confirmed rejected (401).
 - **No live Connect Link was completed.** Completing it needs a human to log
   into a real sandbox bank. So `bank-exchange-code`, the account-persistence
   path and a Mono `bank/sync` have **not** been exercised against live Mono
-  data. Their Mono *calls* are verified only to the extent the docs and the one
-  live probe establish.
-- **The Mono widget was never loaded in a browser**, because the flag is off.
+  data. That the link is *created* and loaded is verified (see below); that it
+  can be *completed* is not.
+- **The Mono widget renders blank in headless Chromium** (Mono's CDN
+  sub-resources do not resolve there). The connect screen did load a live
+  `link.mono.co` frame. Native is authoritative for completing a connection.
 
-## Phase 11 — operator setup required before Phase 12
+## Phase 11 — close-out verification (flags ON)
 
-1. Register the deployed endpoint as a webhook in the Mono dashboard:
-   `https://ztfqckfdvchcqksluqri.supabase.co/functions/v1/mono-webhook`
-   Subscribe to `account_updated`, `account_connected`, `account_unlinked`
-   (and `account_reauthorized`).
-2. Copy the webhook secret Mono displays.
-3. `npx supabase secrets set MONO_WEBHOOK_SECRET=<value>`
-4. Confirm with `npx supabase secrets list`.
-   **Until this is done the webhook rejects every incoming event. That is the
-   correct fail-closed behaviour, not a bug.**
-5. Set the server gate: `npx supabase secrets set FEATURE_MONO=true`.
-6. Flip the client gate in `.env.production`:
-   `EXPO_PUBLIC_FEATURE_MONO=true` (currently `false`), then rebuild/redeploy.
-7. Install the preview APK and walk the loop: connect a real bank → account
-   appears → sync pulls transactions → review → categorize → budget.
+The operator registered the webhook, set `MONO_WEBHOOK_SECRET`, and flipped the
+client flag. Turning the flag on immediately exposed two things that were
+invisible while it was off.
 
-### Phase 11 preview APK
+### 1. The server gate was a separate secret, and it was off
+
+`FEATURE_MONO` (Edge Function secret) and `EXPO_PUBLIC_FEATURE_MONO` (client
+bundle) are independent on purpose. Only the client flag had been set, so the
+UI offered "Connect a real bank" while every server route refused with `404
+NOT_FOUND`. Now set; the webhook returns `401` instead of `404`, which proves
+the gate is on **and** that authenticity verification is running.
+
+| Probe | Expected | Got |
+|---|---|---|
+| Wrong `mono-webhook-secret` | 401 | **401 `WEBHOOK_UNVERIFIED`** |
+| Missing header | 401 | **401 `WEBHOOK_UNVERIFIED`** |
+| Gate off (before) | 404 | 404 `NOT_FOUND` |
+
+### 2. `react-native-webview` does not support web — real bug, fixed
+
+With the flag on, the connect screen rendered *"React Native WebView does not
+support this platform"* and no widget. `react-native-webview@13.16.1` has no
+`react-native-web` implementation. Mono's Connect Link is an ordinary hosted web
+page, so `app/connect-bank.tsx` now renders a plain `<iframe>` on
+`Platform.OS === "web"` and keeps the real `WebView` on native. Completion never
+depended on the WebView: the authoritative channel is the `account_connected`
+webhook claiming the reserved reference, polled on both platforms. The
+postMessage code-capture and per-navigation callbacks stay native-only, which
+matches Mono's documented webhook flow.
+
+**Lesson:** a native-only dependency was added and its web behaviour was never
+exercised, because the feature flag hid it. Feature-flagged code still has to be
+smoke-tested in every state a user can reach it.
+
+### Live Mono sandbox verification — what actually ran
+
+Confirmed against the real API, not a mock:
+
+- `bank-connect-session` reached Mono's `POST /v2/accounts/initiate` and
+  **reserved a `pending` bank_connections row** with `consented_at = null` and
+  an opaque `provider_connection_id` (the `meta.ref`). Observed in the DB:
+  `provider_id = mono`, `status = pending`.
+- The connect screen **loaded a live Connect Link**:
+  `https://link.mono.co/ALW4MP4DM7YR` (and `ALR8ICY7NTIP` on a prior run — a
+  fresh link per run, so the call is genuinely live, not cached).
+- Gate open, button enabled, "Coming soon" gone, navigation to `/connect-bank`
+  works.
+- Demo path and every Phase 10 screen unchanged; **no console errors from the
+  app**.
+
+**Still not verified:** completing a connection. That needs a human to log into
+a real sandbox bank, so `bank-exchange-code`, account persistence and a Mono
+`bank/sync` remain unexercised against live data. The widget's own content also
+does not render in headless Chromium — Mono's CDN sub-resources fail to resolve
+there (`ERR_NAME_NOT_RESOLVED`) — so **the native APK pass remains authoritative
+for completing a connection.**
+
+### Idempotency — proven at the DB layer
+
+`provider_events` behaves as the idempotency mechanism requires:
+
+| Step | Result |
+|---|---|
+| Insert event id `p11-idem-465873898` | **201** |
+| Insert the same `(provider_id, provider_event_id)` again | **409** unique violation |
+| Rows for that event id | **exactly 1** |
+
+### Webhook acceptance — ONE operator command still required
+
+Acceptance of a *correctly authenticated* event cannot be proven by an agent,
+because `MONO_WEBHOOK_SECRET` is now masked in both the CLI and the Management
+API (see the masking note in "Environment state"). Everything up to that point
+is verified: the gate is on, bad and missing secrets are refused, the table and
+its unique key work, and the claim-before-process ordering is in place.
+
+`scripts/mono-webhook-verify.cjs` closes the gap. Run it with the secret in your
+own shell — the value never reaches a log, a commit, or an agent:
+
+```powershell
+$env:MONO_WEBHOOK_SECRET        = '<the value from your Mono dashboard>'
+$env:SUPABASE_URL               = 'https://ztfqckfdvchcqksluqri.supabase.co'
+$env:SUPABASE_SERVICE_ROLE_KEY  = '<service role key>'
+node scripts/mono-webhook-verify.cjs
+```
+
+It asserts five things and prints only ids and row counts:
+
+1. gate ON and a bad secret rejected (401, not 404)
+2. a signed event accepted
+3. `provider_events` written **exactly once**
+4. the **same event redelivered** -> `200 duplicate:true`, still one row
+5. a *new* event id is still accepted (so the gate is not rejecting everything)
+
+Its plumbing is already validated: run against a deliberately wrong secret it
+reports check 1 `PASS` and checks 2–5 `FAIL` with `401`, which proves it reaches
+the webhook and can read and delete `provider_events`.
+
+## Phase 11 — operator setup remaining
+
+Registering the webhook, setting `MONO_WEBHOOK_SECRET`, setting `FEATURE_MONO`
+and flipping the client flag are **done**. Remaining:
+
+1. Run `scripts/mono-webhook-verify.cjs` (above) to prove signed acceptance and
+   duplicate rejection end to end.
+2. Install the preview APK below and walk the loop.
+3. Confirm the deployed web build has the flag on (see the caching note).
+
+### Phase 11 preview APK (flag ON)
 
 | | |
 |---|---|
-| APK | `https://expo.dev/artifacts/eas/AJeqqSe01U6pxrzkbwiJM2C_DjSH1nZeK0IikiPbp-A.apk` |
-| Build page | `https://expo.dev/accounts/buchi208/projects/reconcile/builds/45da1570-07e0-43a4-8715-54fdbcf6946e` |
-| Built from | `83eb253` (Phase 11), Expo SDK 57.0.0, preview profile |
-| EAS queue | ~25 min in queue, ~15 min build |
+| APK | `https://expo.dev/artifacts/eas/YPG8ZY62ea8eoEZBmA2x4pm6VeF75vkcevcU2rkefso.apk` |
+| Build page | `https://expo.dev/accounts/buchi208/projects/reconcile/builds/7ddc8783-583b-4d87-b2b6-f8f74fa6114d` |
+| Built from | `4ea3a3c` (flag on, includes the iframe fix), Expo SDK 57.0.0, preview profile |
+| EAS queue | ~50 min in queue, ~14 min build |
 
-**Native smoke test pending operator installation.**
+An earlier flag-on build (`7576d404`) was **cancelled**: it had been queued
+before the iframe fix was committed, so its `gitCommitHash` pointed at a dirty
+tree rather than a commit. Re-submitting after the commit means the APK always
+corresponds to an exact commit.
 
-Because the APK was built while `EXPO_PUBLIC_FEATURE_MONO=false`, the
-"Connect a real bank" button is **disabled on it** and "Connect a real bank"
-will not open the widget until the operator flips the flag and a new build is
-produced. To test the connect flow on-device: set the flag, then rebuild.
+**Native smoke test pending operator installation.** On device, check: the
+"Connect a real bank" button is **enabled** (the flag is on, so it no longer
+shows "Coming soon") -> it opens the Mono widget -> pick a sandbox bank and log
+in -> the app returns, syncs, and the account appears in Settings ->
+transactions in Activity -> review -> categorize -> budget updates.
 
-Operator checklist on device: the Demo screen's "Connect a real bank" is
-enabled → opens the Mono widget in a WebView → pick a sandbox bank and log in →
-the app returns and syncs → the account appears in Settings → transactions land
-in Activity → review → categorize → budget updates. Then re-enable
-`bank/sync` from the pull-to-refresh path and confirm idempotency (a second
-sync adds zero transactions).
+### Caching note that will bite again
+
+`npx expo export -p web` initially baked the flag as **false** even with
+`EXPO_PUBLIC_FEATURE_MONO=true` correctly present in the env that Expo logged as
+loaded. The cause was a **stale Metro transform cache** — the bundle hash was
+identical across runs, and `expo export`'s own log showed the correct env. Fix:
+
+```powershell
+$env:NODE_ENV = "production"
+npx expo export -p web --clear
+```
+
+If a changed `EXPO_PUBLIC_*` value does not appear in `dist`, suspect the cache
+before suspecting the env file.
 
 ## Phase 11 — testing harness
 
@@ -538,19 +655,23 @@ of regressions.
 
 ## Phase 11 — residual gaps and known unknowns
 
-1. `MONO_WEBHOOK_SECRET` unset; webhook not registered; **no live webhook test
-   was run** (the operator directed this be deferred).
+1. **Signed webhook acceptance is the one unproven path.** The secret is set and
+   registered, but masked to agents. `scripts/mono-webhook-verify.cjs` closes it
+   in one operator command.
 2. **No live Connect Link completion**, so the post-connect path (exchange code,
    account persistence, Mono `bank/sync`) is unexercised against live data.
 3. **The redirect query-parameter name is undocumented.** If the native pass
    shows the widget navigating to the redirect with a code in it, add that
    parameter to `src/lib/monoWidget.ts` — the webhook path is authoritative
    regardless, so nothing depends on it.
-4. `MonoError.code` values are mapped to HTTP statuses per call site; a code
+4. `react-native-webview` has no web implementation, so the web widget is a bare
+   `<iframe>` with no postMessage capture. If a real browser shows the widget
+   posting a completion code that the webhook never claims, revisit here.
+5. `MonoError.code` values are mapped to HTTP statuses per call site; a code
    set that later proves too coarse is a Phase 14 concern.
-5. Webhook failure rows stay `failed` and visible rather than being retried
+6. Webhook failure rows stay `failed` and visible rather than being retried
    forever — deliberate, but a real product needs an operator-facing retry.
-6. `ingest.ts` reads the whole per-user ledger for transfer pairing. Fine at
+7. `ingest.ts` reads the whole per-user ledger for transfer pairing. Fine at
    MVP volume; a large product must page it.
 7. `.expo/types/router.d.ts` is generated and gitignored. It only regenerates
    when the Expo dev server boots; if `tsc` reports an unknown route, run
@@ -1934,30 +2055,42 @@ Use:
 `IMPLEMENT → TEST → INSPECT → FIX → COMMIT → CHECKPOINT → STOP`
 
 ## Current phase
-**Phase 11 — Mono integration — implementation COMPLETE. Live webhook
-verification pending operator setup. Native smoke test pending operator
-installation. Phase 12 not started.**
+**Phase 11 — Mono integration — implementation COMPLETE and the live connect
+path is verified against Mono sandbox. Two items remain: one operator command to
+prove signed webhook acceptance, and the native smoke test. Phase 12 not
+started.**
 
 Delivered in `83eb253`: migration `000005_provider_events`; the frozen
 `FinancialProvider` contract, registry and demo/Mono adapters; the Mono client
 split into pure `normalize.ts`/`webhook.ts` plus I/O `client.ts`; five Edge
 Functions deployed; the WebView Connect route; reauth surfacing in Settings; the
-`EXPO_PUBLIC_FEATURE_MONO` / `FEATURE_MONO` gates (both off); 48 new unit tests;
-and a fix for six pre-existing time-dependent screen-test failures.
+`EXPO_PUBLIC_FEATURE_MONO` / `FEATURE_MONO` gates; 48 new unit tests; and a fix
+for six pre-existing time-dependent screen-test failures.
+
+Since then: `4ea3a3c` fixed a real defect the flag had been hiding
+(`react-native-webview` does not support web — the connect screen now uses an
+iframe on web). With both flags on, `bank-connect-session` was confirmed to
+reach Mono's live `initiate` endpoint, reserve a `pending` connection row, and
+have the connect screen load a real `link.mono.co` Connect Link.
 
 This section was previously "Current phase: Phase 1", then "Phase 10B close".
 Both were stale and superseded — see "Current state" at the top of this file,
 which is authoritative.
 
 ## Next exact task
-**Operator setup for Phase 11**, in this order — see "Phase 11 — operator setup
-required before Phase 12" for the exact commands. Register `mono-webhook` with
-Mono, set `MONO_WEBHOOK_SECRET`, set `FEATURE_MONO=true`, flip
-`EXPO_PUBLIC_FEATURE_MONO=true`, install the preview APK and walk the loop.
+**Finish Phase 11 verification**, then Phase 12. In order:
 
-Then, and only then: **Phase 12 — RevenueCat monetization** (§Phase 12 of
-`IMPLEMENTATION_PLAN.md`; `ARCHITECTURE.md` §10). Do not start Phase 12 before
-the operator setup above, and do not start Phase 13.
+1. Run `scripts/mono-webhook-verify.cjs` with `MONO_WEBHOOK_SECRET` in your
+   shell. Exact command in "Webhook acceptance — ONE operator command still
+   required". This proves signed acceptance, single-write, and duplicate
+   rejection.
+2. Install the preview APK (flag ON) and walk the connect → sync → review →
+   categorize → budget loop. This is the authoritative check for **completing** a
+   connection, which no automated pass can do.
+3. Confirm the deployed web build has the flag on (cached-export note).
+
+Then: **Phase 12 — RevenueCat monetization** (§Phase 12 of
+`IMPLEMENTATION_PLAN.md`; `ARCHITECTURE.md` §10). Do not start Phase 13.
 
 Phase 10B close is done and must not be reopened without a stated reason.
 Before changing code in any phase:
